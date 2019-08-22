@@ -1,0 +1,87 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",   
+    "tasks": [         
+        {
+            "label": "Configure",             
+            "type": "shell",
+            "command":"node configure.js",            
+            "problemMatcher":[],
+            "presentation": {                
+                "focus": true                
+            }
+       },{
+             "label": "MakeDirectory",             
+             "type": "shell",
+             "command":"mkdir -p -f build/${config:BuildConfig}",
+             "windows": {
+                "command":"cmd /c if not exist build\\${config:BuildConfigWin32} md build\\${config:BuildConfigWin32}", 
+             }, 
+             "problemMatcher":[]
+        },       
+        {            
+            "label": "CMakeGenerate",
+            "type": "shell",
+            "options": {"cwd": "./build/${config:BuildConfig}"},
+            "command": "cmake -G Ninja \"${workspaceFolder}\" -DCMAKE_BUILD_TYPE=Debug" ,
+            "problemMatcher":[],
+            "dependsOn":[
+                "MakeDirectory"
+            ],
+            "group": "none"                
+        },
+        {
+            "label": "Build",
+            "type": "shell",
+            "options": {"cwd": "./build/${config:BuildConfig}"},
+            "command": "ninja",
+            "dependsOn":[
+                "CMakeGenerate"
+            ],
+            
+            "problemMatcher":{
+                "owner": "cpp",
+                "fileLocation": ["relative", "${workspaceFolder}/build/${config:BuildConfig}"],
+                "pattern": {
+                    "regexp": "^(.*):(\\d+):(\\d+):.*\\s+(warning|error):\\s+(.*)$",
+                    "file": 1,
+                    "line": 2,
+                    "column": 3,
+                    "severity": 4,
+                    "message": 5
+                }
+            },        
+            "group": {                
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Flash",
+            "type": "shell",
+            "options": {"cwd": "./build/${config:BuildConfig}"},
+            "command": "ninja flash",          
+            
+            "problemMatcher":[]
+        },  {
+            "label": "StartGdbServer",
+            "type": "shell",
+            "options": {"cwd": "./build/${config:BuildConfig}"},
+            "command": "ninja gdb_server",          
+            "windows": {
+                "command": "cmd /c gdb_server.bat",     
+            },
+            "problemMatcher":[]
+        },      
+        {
+            "label": "Clean",
+            "type":"shell", 
+            "command":"rm -rf build/${config:BuildConfig}", 
+            "windows": {
+                "command":"cmd /c rd /s /q build\\${config:BuildConfigWin32}", 
+            },           
+            "problemMatcher":[]
+       }
+    ]
+}

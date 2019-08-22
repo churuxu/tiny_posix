@@ -1,0 +1,25 @@
+{
+  "catch2TestExplorer.debugConfigTemplate": {
+    "type": "cppdbg",
+    "MIMode": "gdb",
+    "windows":{
+      "miDebuggerPath": "gdb.exe"
+    },
+    "miDebuggerPath": "gdb",
+    "program": "${exec}",
+    "args": "${args}",
+    "cwd": "${cwd}",
+    "env": "${envObj}",
+    "externalConsole": true
+  },
+  "files.associations": {
+    "*.h": "cpp"   
+  },
+
+  "C_Cpp.errorSquiggles": "Disabled",
+  "C_Cpp.autoAddFileAssociations": false,
+
+  "BuildConfig":"${CONFIG_PATH}",
+  "BuildConfigWin32":"${CONFIG_PATH_WIN32}"  
+    
+}
