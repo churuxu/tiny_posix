@@ -48,11 +48,11 @@ extern "C" {
 
 extern GPIO_TypeDef* gpio_ports_[];
 
-//按port和pin获取fd，示例 GPIO_PIN_FD(PORTC, PIN13, 0)
-#define GPIO_PIN_FD(port, pin) (port|(pin<<8)|FD_TYPE_GPIO)
+//按port和pin获取fd，示例 GPIO_FD(PORTC, PIN13)
+#define GPIO_FD(port, pin) (port|(pin<<8)|FD_TYPE_GPIO)
 
 //获取反向输出的fd 
-#define GPIO_PIN_FD_REVERSE(port, pin) (0x10000000|port|(pin<<8)|FD_TYPE_GPIO)
+#define GPIO_FD_REVERSE(port, pin) (0x10000000|port|(pin<<8)|FD_TYPE_GPIO)
 
 //fd获取port 
 #define GPIO_FD_GET_PORT(fd) (gpio_ports_[(fd>>24)&0x0f])
@@ -86,6 +86,8 @@ static void gpio_toggle(int fd){
     HAL_GPIO_TogglePin(GPIO_FD_GET_PORT(fd), GPIO_FD_GET_PIN(fd));
 }
 */
+
+#define UART_FD(id) ((id-1)<<8|FD_TYPE_UART)
 
 #ifdef __cplusplus
 }

@@ -22,7 +22,7 @@ int gpio_config(int fd, int key, void* value);
 int gpio_read(int fd, void* buf, int len);
 int gpio_write(int fd, const void* buf, int len);
 
-int uart_init(int fd);
+int uart_init(int fd, int flags);
 int uart_config(int fd, int key, void* value);
 int uart_read(int fd, void* buf, int len);
 int uart_write(int fd, const void* buf, int len);

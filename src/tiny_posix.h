@@ -1,5 +1,12 @@
 #pragma once
 
+/*
+
+http://pubs.opengroup.org/onlinepubs/9699919799/
+
+*/
+
+
 //win32 headers
 #ifdef _WIN32
 #include <winsock2.h>
@@ -37,7 +44,7 @@ extern "C" {
 //============== types ===============
 
 typedef int _tp_ssize_t;
-typedef int _tp_speed_t;
+typedef uint16_t _tp_speed_t;
 typedef uint64_t _tp_off_t;
 typedef uint64_t _tp_clock_t;
 typedef uint64_t _tp_time_t;
@@ -72,9 +79,9 @@ struct _tp_stat{
 };
 
 struct _tp_termios{
-    unsigned short sa_family;
-    char sa_data[14];
+    uint32_t c_cflag;
 };
+
 struct _tp_utimbuf{
     unsigned short sa_family;
     char sa_data[14];
@@ -111,16 +118,39 @@ struct _tp_utimbuf{
 #define EWOULDBLOCK EAGAIN
 
 //============== 串口 ================
-#define TCSANOW   0   //立即改变属性
-#define TCSADRAIN 1   //立即改变属性
+
+//波特率
+#define B300    3
+#define B600    6
+#define B1200   12
+#define B2400   24
+#define B4800   48
+#define B9600   96
+#define B19200  192
+#define B38400  384
+#define B57600  576
+#define B115200 1152
+
+//数据位
+#define CS5   0x050000
+#define CS6   0x060000
+#define CS7   0x070000
+#define CS8   0x080000
+#define CSIZE 0xff0000
+
+//停止位
+#define CSTOPB 0x01000000 //有=2 无=1
+
+//校验位   PARENB|PARODD=奇校验  PARENB=偶校验
+#define PARENB 0x02000000 
+#define PARODD 0x04000000
+
+//修改串口参数
+#define TCSANOW 0
+#define TCSADRAIN 1
 #define TCSAFLUSH 2
 
-#define CS5 5
-#define CS6 6
-#define CS7 7
-#define CS8 8
 
-#define CSTOPB 0x10
 
 //============== renames ===============
 #define off_t _tp_off_t

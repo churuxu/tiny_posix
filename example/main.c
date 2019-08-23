@@ -4,7 +4,9 @@
 
 
 int main(){
-    int led = GPIO_PIN_FD(PORTA, PIN1);
+    int led = GPIO_FD(PORTA, PIN15);
+    int port = UART_FD(2);
+
     tiny_posix_init();
 
     hal_config();
@@ -14,6 +16,7 @@ int main(){
         sleep(1);
         gpio_reset(led);
         sleep(1);
+        //uart_write(port, "hello", 5);
     }
 
     return 0;
