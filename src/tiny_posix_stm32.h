@@ -52,7 +52,7 @@ extern "C" {
 #define PIN14 0x4000
 #define PIN15 0x8000
 
-
+typedef void (*irq_handler)();
 
 extern GPIO_TypeDef* gpio_ports_[];
 
@@ -69,16 +69,18 @@ extern GPIO_TypeDef* gpio_ports_[];
 #define GPIO_FD_GET_PIN(fd) ((fd>>8)&0xffff)
 
 //是否反向输出  
-#define GPIO_FD_IS_REVERSE(fd) (fd&0xf0000000)
+#define GPIO_FD_IS_REVERSE(fd) (fd&0x70000000)
 
 
 #define gpio_status(fd)  HAL_GPIO_ReadPin(GPIO_FD_GET_PORT(fd), GPIO_FD_GET_PIN(fd))
 
 #define gpio_set(fd) HAL_GPIO_WritePin(GPIO_FD_GET_PORT(fd), GPIO_FD_GET_PIN(fd), (0 == GPIO_FD_IS_REVERSE(fd)))
 
-#define gpio_reset(fd) HAL_GPIO_WritePin(GPIO_FD_GET_PORT(fd), GPIO_FD_GET_PIN(fd), GPIO_FD_IS_REVERSE(fd))
+#define gpio_reset(fd) HAL_GPIO_WritePin(GPIO_FD_GET_PORT(fd), GPIO_FD_GET_PIN(fd), (0 != GPIO_FD_IS_REVERSE(fd)))
 
 #define gpio_toggle(fd) HAL_GPIO_TogglePin(GPIO_FD_GET_PORT(fd), GPIO_FD_GET_PIN(fd))
+
+void gpio_set_irq(int fd, irq_handler func);
 
 /*
 static int  gpio_status(int fd){

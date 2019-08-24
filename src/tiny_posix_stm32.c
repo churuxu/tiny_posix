@@ -30,6 +30,9 @@ GPIO_TypeDef* gpio_ports_[] = {
 #endif
 };
 
+//gpio中断回调函数
+static irq_handler gpio_irqs_[16];
+
 USART_TypeDef* uarts_[] = {
     USART1,
     USART2,
@@ -93,20 +96,21 @@ int tiny_posix_init(){
 
 int gpio_init(int fd, int flags){
     int pull, mod;
-    int flagm, flagp;
-    flagm = ((flags >> 8) & 0xff);
+    int flagp;   
     flagp = ((flags ) & 0xff);
 
     mod = GPIO_MODE_OUTPUT_PP;
-    if(flagm == GPIO_FLAGS_INPUT){
+    if(flags & GPIO_FLAGS_INTERRUPT){
+        mod = GPIO_MODE_IT_FALLING;
+    }else if(flags & GPIO_FLAGS_INPUT){
         mod = GPIO_MODE_INPUT;
-    }    
+    }
     pull = GPIO_NOPULL;
     if(flagp == GPIO_FLAGS_PULL_UP){
         pull = GPIO_PULLUP;
     }else if(flagp == GPIO_FLAGS_PULL_DOWN){
         pull = GPIO_PULLDOWN;
-    } 
+    }
 
     GPIO_InitTypeDef GPIO_InitStruct;
     GPIO_InitStruct.Pin = GPIO_FD_GET_PIN(fd);
@@ -117,6 +121,37 @@ int gpio_init(int fd, int flags){
 
     return 0; 
 }
+
+void gpio_set_irq(int fd, irq_handler func){
+    IRQn_Type IRQnb = EXTI0_IRQn;
+    uint32_t priority = 0;
+    uint16_t pin = GPIO_FD_GET_PIN(fd);
+    int index = 0;
+    switch(pin) {
+        case GPIO_PIN_0:  index = 0;  IRQnb = EXTI0_IRQn;	break;
+        case GPIO_PIN_1:  index = 1;  IRQnb = EXTI1_IRQn;	break;
+        case GPIO_PIN_2:  index = 2;  IRQnb = EXTI2_IRQn;	break;
+        case GPIO_PIN_3:  index = 3;  IRQnb = EXTI3_IRQn;	break;
+        case GPIO_PIN_4:  index = 4;  IRQnb = EXTI4_IRQn;	break;
+        case GPIO_PIN_5:  index = 5;  IRQnb = EXTI9_5_IRQn; break;
+        case GPIO_PIN_6:  index = 6;  IRQnb = EXTI9_5_IRQn;	break;
+        case GPIO_PIN_7:  index = 7;  IRQnb = EXTI9_5_IRQn;	break;
+        case GPIO_PIN_8:  index = 8;  IRQnb = EXTI9_5_IRQn;	break;
+        case GPIO_PIN_9:  index = 9;  IRQnb = EXTI9_5_IRQn; break;
+        case GPIO_PIN_10: index = 10; IRQnb = EXTI15_10_IRQn; break;
+        case GPIO_PIN_11: index = 11; IRQnb = EXTI15_10_IRQn; break;
+        case GPIO_PIN_12: index = 12; IRQnb = EXTI15_10_IRQn; break;
+        case GPIO_PIN_13: index = 13; IRQnb = EXTI15_10_IRQn; break;
+        case GPIO_PIN_14: index = 14; IRQnb = EXTI15_10_IRQn; break;
+        case GPIO_PIN_15: index = 15; IRQnb = EXTI15_10_IRQn; break;
+        default:return;
+    }
+    gpio_irqs_[index] = func;
+
+    HAL_NVIC_SetPriority(IRQnb, priority, 0);
+    HAL_NVIC_EnableIRQ(IRQnb);    
+}
+
 
 
 int gpio_config(int fd, int key, void* value){
@@ -137,6 +172,10 @@ int gpio_write(int fd, const void* buf, int len){
     }    
     return 1;
 }
+
+
+
+
 
 static UART_HandleTypeDef* uart_get_handle(int fd){
     int index = (fd>>8);    
@@ -180,7 +219,7 @@ int uart_init(int fd, int flags){
 }
 
 int uart_config(int fd, int key, void* value){
-    struct termios* attr;
+    //struct termios* attr;
     switch(key){
         case UART_ATTR_SET:
 
@@ -231,9 +270,45 @@ unsigned int _tp_usleep(unsigned int micro_seconds){
 
 
 
+#define HANDLE_GPIO_IRQ(pin, index) \
+    if(__HAL_GPIO_EXTI_GET_IT(pin) != RESET){\
+        __HAL_GPIO_EXTI_CLEAR_IT(pin);\
+        if(gpio_irqs_[index])gpio_irqs_[index]();\
+    }
 
-void SysTick_Handler(void){ 
+//============= 各系统中断 ===============
+void SysTick_Handler(){ 
     HAL_IncTick();
     HAL_SYSTICK_IRQHandler(); 
+}
+void EXTI0_IRQHandler(){
+    HANDLE_GPIO_IRQ(GPIO_PIN_0, 0);
+}
+void EXTI1_IRQHandler(){
+    HANDLE_GPIO_IRQ(GPIO_PIN_1, 1);
+}
+void EXTI2_IRQHandler(){
+    HANDLE_GPIO_IRQ(GPIO_PIN_2, 2);
+}
+void EXTI3_IRQHandler(){
+    HANDLE_GPIO_IRQ(GPIO_PIN_3, 3);
+}
+void EXTI4_IRQHandler(){
+    HANDLE_GPIO_IRQ(GPIO_PIN_4, 4);
+}
+void EXTI9_5_IRQHandler(){
+    HANDLE_GPIO_IRQ(GPIO_PIN_5, 5);
+    HANDLE_GPIO_IRQ(GPIO_PIN_6, 6);
+    HANDLE_GPIO_IRQ(GPIO_PIN_7, 7);
+    HANDLE_GPIO_IRQ(GPIO_PIN_8, 8);
+    HANDLE_GPIO_IRQ(GPIO_PIN_9, 9);
+}
+void EXTI15_10_IRQHandler(){
+    HANDLE_GPIO_IRQ(GPIO_PIN_10, 10);
+    HANDLE_GPIO_IRQ(GPIO_PIN_11, 11);
+    HANDLE_GPIO_IRQ(GPIO_PIN_12, 12);
+    HANDLE_GPIO_IRQ(GPIO_PIN_13, 13);
+    HANDLE_GPIO_IRQ(GPIO_PIN_14, 14);
+    HANDLE_GPIO_IRQ(GPIO_PIN_15, 15);
 }
 

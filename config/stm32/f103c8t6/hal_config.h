@@ -1,11 +1,13 @@
 
-#define LED GPIO_FD(PORTC, PIN13)
+#define LED1 GPIO_FD_REVERSE(PORTC, PIN13)
+#define KEY1 GPIO_FD(PORTA, PIN0)
+
 #define SERIAL_PORT UART_FD(1)
 
 void HAL_Config(){
-    gpio_init(LED, GPIO_FLAGS_OUTPUT);
-
-    uart_init(SERIAL_PORT, B9600|CS8);
+    gpio_init(LED1, GPIO_FLAGS_OUTPUT);
+    gpio_init(KEY1, GPIO_FLAGS_INPUT|GPIO_FLAGS_INTERRUPT);
+    //uart_init(SERIAL_PORT, B9600|CS8);
 }
 
 

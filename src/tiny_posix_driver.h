@@ -8,6 +8,7 @@ extern "C" {
 
 #define GPIO_FLAGS_OUTPUT     0x0000
 #define GPIO_FLAGS_INPUT      0x0100
+#define GPIO_FLAGS_INTERRUPT  0x0200
 
 #define GPIO_FLAGS_NO_PULL    0x00
 #define GPIO_FLAGS_PULL_UP    0x01
