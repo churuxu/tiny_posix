@@ -15,7 +15,19 @@
 GPIO_TypeDef* gpio_ports_[] = {
     GPIOA,
     GPIOB,
-    GPIOC
+    GPIOC,
+#ifdef GPIOD
+    GPIOD,
+#endif
+#ifdef GPIOE
+    GPIOE,
+#endif
+#ifdef GPIOF
+    GPIOF,
+#endif
+#ifdef GPIOG
+    GPIOG,
+#endif
 };
 
 USART_TypeDef* uarts_[] = {

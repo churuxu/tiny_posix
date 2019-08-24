@@ -1,10 +1,11 @@
 
 #define LED GPIO_FD(PORTC, PIN13)
+#define SERIAL_PORT UART_FD(1)
 
 void HAL_Config(){
     gpio_init(LED, GPIO_FLAGS_OUTPUT);
 
-    //uart_init(UART_FD(2), B115200|CS8);
+    uart_init(SERIAL_PORT, B9600|CS8);
 }
 
 

@@ -5,7 +5,7 @@
 
 int main(){
     int led = LED;
-    int port = UART_FD(2);
+    //int port = SERIAL_PORT;
 
     tiny_posix_init();  
 
@@ -14,7 +14,9 @@ int main(){
         sleep(1);
         gpio_reset(led);
         sleep(1);
-        //uart_write(port, "hello", 5);
+        //uart_write(port, "SOpen_beepE", 11);
+        //usleep(100000);
+        //uart_write(port, "SClose_beepE", 12);
     }
 
     return 0;

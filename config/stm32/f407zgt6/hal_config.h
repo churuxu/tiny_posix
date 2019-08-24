@@ -5,8 +5,8 @@
 
 
 void HAL_Config(){
-    gpio_init(LED, GPIO_FLAGS_OUTPUT);
-
+    gpio_init(LED, GPIO_FLAGS_OUTPUT | GPIO_FLAGS_PULL_UP);
+    
     //uart_init(UART_FD(2), B115200|CS8);
    
 }
