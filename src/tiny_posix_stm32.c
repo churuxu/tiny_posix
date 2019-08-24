@@ -26,8 +26,19 @@ USART_TypeDef* uarts_[] = {
 
 UART_HandleTypeDef uart_handles_[8];
 
+/*
+clock
+HSI 高速内部时钟，8MHz
+LSI 低速内部时钟，40kHz
+HSE 高速外部时钟，4MHz~16MHz
+LSE 低速外部时钟，32.768kHz
 
+PLL HSI/2、HSE或者HSE/2
 
+*/
+
+extern void SystemClock_Config();
+extern void HAL_Config();
 
 static void gpio_clock_init(){
     __HAL_RCC_GPIOA_CLK_ENABLE();
@@ -39,59 +50,31 @@ static void gpio_clock_init(){
 #ifdef GPIOE
     __HAL_RCC_GPIOE_CLK_ENABLE();
 #endif
-}
-
-static int SystemClock_Config(){
-    RCC_OscInitTypeDef RCC_OscInitStruct;
-    RCC_ClkInitTypeDef RCC_ClkInitStruct;
-    RCC_PeriphCLKInitTypeDef PeriphClkInit;
-
-    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE|RCC_OSCILLATORTYPE_LSE;
-    RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-    RCC_OscInitStruct.HSEPredivValue = RCC_HSE_PREDIV_DIV1;
-    RCC_OscInitStruct.LSEState = RCC_LSE_ON;
-    RCC_OscInitStruct.HSIState = RCC_HSI_ON;
-    RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-    RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-    RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL9;
-    if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
-    {
-        return -1;
-    }
-
-    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-    RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-    RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
-    RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
-
-    if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
-    {
-        return -1;
-    }
-
-    PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_RTC;
-    PeriphClkInit.RTCClockSelection = RCC_RTCCLKSOURCE_LSE;
-    if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInit) != HAL_OK)
-    {
-        return -1;
-    }
-
-    HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq()/1000);
-
-    HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK);
-
-    HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
-    return 0;
+#ifdef GPIOF
+    __HAL_RCC_GPIOF_CLK_ENABLE();
+#endif
+#ifdef GPIOG
+    __HAL_RCC_GPIOG_CLK_ENABLE();
+#endif
 }
 
 
 int tiny_posix_init(){
     int ret = 0;
     HAL_Init();
-    ret += SystemClock_Config();
+
     gpio_clock_init();
+    
+    SystemClock_Config();
+
+    HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq()/1000);
+
+    HAL_SYSTICK_CLKSourceConfig(SYSTICK_CLKSOURCE_HCLK);
+
+    HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
+
+    HAL_Config();
+
     return ret;
 }
 

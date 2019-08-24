@@ -13,6 +13,7 @@ extern "C" {
 #define GPIO_FLAGS_PULL_UP    0x01
 #define GPIO_FLAGS_PULL_DOWN  0x02
 
+
 //
 int tiny_posix_init();
 int fd_mount(const char* name, int fd);

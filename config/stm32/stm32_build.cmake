@@ -21,6 +21,7 @@ set(JLINKCMD "r\r\n")
 set(JLINKCMD "${JLINKCMD}h\r\n")
 set(JLINKCMD "${JLINKCMD}loadfile ${CMAKE_BINARY_DIR}/${PROJNAME}.bin 0x08000000\r\n")
 set(JLINKCMD "${JLINKCMD}g\r\n")
+set(JLINKCMD "${JLINKCMD}r\r\n")
 set(JLINKCMD "${JLINKCMD}q\r\n")
 file(WRITE ${CMAKE_BINARY_DIR}/jlink.txt ${JLINKCMD})
 

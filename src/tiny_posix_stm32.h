@@ -1,7 +1,15 @@
 ﻿#pragma once
 
-#ifdef STM32_DRIVER_HEADER //stm32f1xx.h
-#include STM32_DRIVER_HEADER  
+#if defined(STM32F1)
+#include "stm32f1xx.h" 
+#elif defined(STM32F2) 
+#include "stm32f2xx.h"
+#elif defined(STM32F3) 
+#include "stm32f3xx.h"
+#elif defined(STM32F4) 
+#include "stm32f4xx.h"
+#else
+
 #endif
 
 #ifdef __cplusplus

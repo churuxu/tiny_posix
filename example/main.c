@@ -4,12 +4,10 @@
 
 
 int main(){
-    int led = GPIO_FD(PORTA, PIN15);
+    int led = LED;
     int port = UART_FD(2);
 
-    tiny_posix_init();
-
-    hal_config();
+    tiny_posix_init();  
 
     while(1){
         gpio_set(led);
