@@ -11,7 +11,7 @@ set(SRC_EXTS *.cpp *.c *.cc)
 
 set(HEADER_EXTS *.h *.hpp)
 
-list(APPEND EXCLUDES ".*config/.*")
+list(APPEND EXCLUDES ".*/config/.*")
 
 set(FLAGS )
 set(CFLAGS ${FLAGS})
@@ -37,6 +37,7 @@ set(LDFLAGS "")
 if(EXISTS "${CMAKE_CURRENT_LIST_DIR}/config/selected.txt")
 	file(STRINGS "${CMAKE_CURRENT_LIST_DIR}/config/selected.txt" CONFIG_SEL LIMIT_COUNT 1)
 	set(CONFIG_DIR ${CMAKE_CURRENT_LIST_DIR}/config/${CONFIG_SEL})
+	message("-- Configuring with ${CONFIG_SEL}")
 endif()
 include(${CONFIG_DIR}/config.cmake OPTIONAL)
 

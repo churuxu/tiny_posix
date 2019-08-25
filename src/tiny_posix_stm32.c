@@ -1,6 +1,5 @@
 
 #include "tiny_posix_stm32.h"
-#include "tiny_posix_driver.h"
 #include "tiny_posix.h"
 
 #ifndef GPIO_SPEED_FREQ_HIGH
@@ -15,7 +14,9 @@
 GPIO_TypeDef* gpio_ports_[] = {
     GPIOA,
     GPIOB,
+#ifdef GPIOC    
     GPIOC,
+#endif    
 #ifdef GPIOD
     GPIOD,
 #endif
@@ -33,24 +34,7 @@ GPIO_TypeDef* gpio_ports_[] = {
 //gpio中断回调函数
 static irq_handler gpio_irqs_[16];
 
-USART_TypeDef* uarts_[] = {
-    USART1,
-    USART2,
-    USART3,
-};
 
-UART_HandleTypeDef uart_handles_[8];
-
-/*
-clock
-HSI 高速内部时钟，8MHz
-LSI 低速内部时钟，40kHz
-HSE 高速外部时钟，4MHz~16MHz
-LSE 低速外部时钟，32.768kHz
-
-PLL HSI/2、HSE或者HSE/2
-
-*/
 
 extern void SystemClock_Config();
 extern void HAL_Config();
@@ -74,8 +58,7 @@ static void gpio_clock_init(){
 }
 
 
-int tiny_posix_init(){
-    int ret = 0;
+void tiny_posix_init(){    
     HAL_Init();
 
     gpio_clock_init();
@@ -88,38 +71,19 @@ int tiny_posix_init(){
 
     HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
 
-    HAL_Config();
-
-    return ret;
+    HAL_Config();    
 }
 
 
-int gpio_init(int fd, int flags){
-    int pull, mod;
-    int flagp;   
-    flagp = ((flags ) & 0xff);
-
-    mod = GPIO_MODE_OUTPUT_PP;
-    if(flags & GPIO_FLAGS_INTERRUPT){
-        mod = GPIO_MODE_IT_FALLING;
-    }else if(flags & GPIO_FLAGS_INPUT){
-        mod = GPIO_MODE_INPUT;
-    }
-    pull = GPIO_NOPULL;
-    if(flagp == GPIO_FLAGS_PULL_UP){
-        pull = GPIO_PULLUP;
-    }else if(flagp == GPIO_FLAGS_PULL_DOWN){
-        pull = GPIO_PULLDOWN;
-    }
-
+int gpio_init(int fd, int mode, int pull){
     GPIO_InitTypeDef GPIO_InitStruct;
     GPIO_InitStruct.Pin = GPIO_FD_GET_PIN(fd);
-    GPIO_InitStruct.Mode = mod;
+    GPIO_InitStruct.Mode = mode;
     GPIO_InitStruct.Pull = pull;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
     HAL_GPIO_Init(GPIO_FD_GET_PORT(fd), &GPIO_InitStruct);   
-
-    return 0; 
+    //gpio_reset(fd);
+    return 0;    
 }
 
 void gpio_set_irq(int fd, irq_handler func){
@@ -175,6 +139,25 @@ int gpio_write(int fd, const void* buf, int len){
 
 
 
+//======================== uart ========================
+
+USART_TypeDef* uarts_[] = {
+    USART1,
+    USART2,
+#ifdef USART3   
+    USART3,
+#endif     
+#ifdef UART4
+    UART4,
+#endif 
+#ifdef UART5
+    UART5,
+#endif     
+};
+
+
+UART_HandleTypeDef uart_handles_[sizeof(uarts_)/sizeof(void*)];
+
 
 
 static UART_HandleTypeDef* uart_get_handle(int fd){
@@ -212,8 +195,29 @@ static int uart_set_attr(int fd, const struct termios* attr){
     return 0;
 }
 
-int uart_init(int fd, int flags){
+int uart_init(int fd, int tx, int rx, int flags){
     struct termios attr;
+    int index = (fd>>8);
+
+    //clk enable
+    switch(index){
+        case 0: __HAL_RCC_USART1_CLK_ENABLE(); break;
+        case 1: __HAL_RCC_USART2_CLK_ENABLE(); break;
+#ifdef USART3        
+        case 2: __HAL_RCC_USART3_CLK_ENABLE(); break;
+#endif
+#ifdef UART4        
+        case 3: __HAL_RCC_UART4_CLK_ENABLE(); break;
+#endif
+#ifdef UART5 
+        case 4: __HAL_RCC_UART5_CLK_ENABLE(); break;
+#endif        
+        default:return -1;
+    }
+    
+    gpio_init(tx, GPIO_MODE_AF_PP, GPIO_NOPULL);
+    gpio_init(rx, GPIO_MODE_INPUT, GPIO_NOPULL);
+
     attr.c_cflag = flags;
     return uart_set_attr(fd, &attr);    
 }
@@ -230,11 +234,19 @@ int uart_config(int fd, int key, void* value){
     }
     return 0;
 }
+
 int uart_read(int fd, void* buf, int len){
+    UART_HandleTypeDef* uart = uart_get_handle(fd);
+    if(!uart)return -1;
+    /*  
+    if(HAL_OK == HAL_UART_Receive(uart, (uint8_t*)buf, len, 3000)){
+        return len;
+    } */      
     return 0;
 }
 int uart_write(int fd, const void* buf, int len){
-    UART_HandleTypeDef* uart = uart_get_handle(fd);  
+    UART_HandleTypeDef* uart = uart_get_handle(fd); 
+    if(!uart)return -1; 
     if(HAL_OK == HAL_UART_Transmit(uart, (uint8_t*)buf, len, 3000)){
         return len;
     }
@@ -258,6 +270,32 @@ int _tp_tcgetattr(int fd, struct termios* attr){
 int _tp_tcsetattr(int fd, int opt, const struct termios* attr){
     return uart_set_attr(fd, attr);
 }
+//=====================================================
+
+
+//======================== spi ========================
+
+SPI_TypeDef* spis_[] = {
+    SPI1,
+#ifdef SPI2
+    SPI2,
+#endif
+#ifdef SPI3
+    SPI3,
+#endif
+};
+
+
+SPI_HandleTypeDef spi_handles_[4];
+
+int spi_init(int fd){
+    return 0;
+}
+
+
+
+//=====================================================
+
 
 unsigned int _tp_sleep(unsigned int seconds){
     HAL_Delay(seconds * 1000);
@@ -267,6 +305,12 @@ unsigned int _tp_usleep(unsigned int micro_seconds){
     HAL_Delay(micro_seconds / 1000);
     return 0;
 }
+
+
+
+
+
+
 
 
 

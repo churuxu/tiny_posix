@@ -1,12 +1,18 @@
 
-#define LED GPIO_FD(PORTE, PIN3)
+#define LED1 GPIO_FD(PORTE, 3)
+#define LED2 GPIO_FD(PORTE, 4)
+#define LED3 GPIO_FD(PORTG, 9)
 
+#define KEY1 GPIO_FD(PORTF, 9)
 
 
 
 void HAL_Config(){
-    gpio_init(LED, GPIO_FLAGS_OUTPUT | GPIO_FLAGS_PULL_UP);
-    
+    gpio_init(LED1, GPIO_MODE_OUTPUT_PP, GPIO_PULLUP);
+    gpio_init(LED2, GPIO_MODE_OUTPUT_PP, GPIO_PULLUP);
+    gpio_init(LED3, GPIO_MODE_OUTPUT_PP, GPIO_PULLUP);
+
+    gpio_init(KEY1, GPIO_MODE_IT_RISING, 0);
     //uart_init(UART_FD(2), B115200|CS8);
    
 }

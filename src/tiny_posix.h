@@ -2,6 +2,7 @@
 
 /*
 
+user layer:
 http://pubs.opengroup.org/onlinepubs/9699919799/
 
 */
@@ -34,7 +35,6 @@ http://pubs.opengroup.org/onlinepubs/9699919799/
 #include "tiny_posix_stm32.h"
 #endif
 
-#include "tiny_posix_driver.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -11,7 +11,7 @@ set(SRC_DIR STM32Cube_FW_F4_V1.7.0)
 
 set(PACKAGE_URL http://sw-center.st.com/packs/resource/firmware/stm32cube_fw_f4_v${PACKAGE_VERSION}.zip)
 
-set(EXCLUDES ".*_ll_.*" ".*Legacy/.*")
+set(EXCLUDES ".*Legacy/.*")
 
 if(NOT ${PACKAGE_NAME} IN_LIST LIBS)
 	return()
@@ -49,7 +49,7 @@ endif()
 
 string(TOLOWER ${MCU_DEFINE} mcu_define_lcase)
 
-set(FLAGS "-DUSE_HAL_DRIVER -D${MCU_DEFINE}")
+set(FLAGS "-DUSE_HAL_DRIVER -DUSE_FULL_LL_DRIVER -D${MCU_DEFINE}")
 
 
 
