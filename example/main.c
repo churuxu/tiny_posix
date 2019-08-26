@@ -32,8 +32,9 @@ void on_key(){
 }
 
 int main(){
-    int port = SERIAL1;
-
+    int port1 = SERIAL1;
+    int port2 = SERIAL2;
+    
     tiny_posix_init(); 
 
     gpio_set_irq(KEY1, on_key);
@@ -42,7 +43,8 @@ int main(){
         loop_leds();
         sleep(1);
         
-        uart_write(port, "hello", 5);
+        uart_write(port1, "hello", 5);
+        uart_write(port2, "world", 5);
         //usleep(100000);
         //uart_write(port, "SClose_beepE", 12);
     }

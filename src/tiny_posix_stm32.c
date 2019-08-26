@@ -3,7 +3,7 @@
 #include "tiny_posix.h"
 
 #ifndef GPIO_SPEED_FREQ_HIGH
-#define GPIO_SPEED_FREQ_HIGH GPIO_SPEED_HIGH
+#define GPIO_SPEED_FREQ_HIGH GPIO_SPEED_FAST
 #endif
 
 #define UART_ATTR_GET 0
@@ -74,16 +74,23 @@ void tiny_posix_init(){
     HAL_Config();    
 }
 
-
-int gpio_init(int fd, int mode, int pull){
+int gpio_init_ex(int fd, int mode, int pull, int af){
     GPIO_InitTypeDef GPIO_InitStruct;
     GPIO_InitStruct.Pin = GPIO_FD_GET_PIN(fd);
     GPIO_InitStruct.Mode = mode;
     GPIO_InitStruct.Pull = pull;
     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+#ifdef IS_GPIO_AF 
+    GPIO_InitStruct.Alternate = af;
+#endif
     HAL_GPIO_Init(GPIO_FD_GET_PORT(fd), &GPIO_InitStruct);   
     //gpio_reset(fd);
     return 0;    
+}
+
+
+int gpio_init(int fd, int mode, int pull){    
+    return gpio_init_ex(fd, mode, pull, 0);    
 }
 
 void gpio_set_irq(int fd, irq_handler func){
@@ -195,9 +202,30 @@ static int uart_set_attr(int fd, const struct termios* attr){
     return 0;
 }
 
+
+static int uart_get_gpio_af(int index){
+#ifdef GPIO_AF7_USART1
+    if(index == 0)return GPIO_AF7_USART1;
+#endif
+#ifdef GPIO_AF7_USART2
+    if(index == 1)return GPIO_AF7_USART2;
+#endif
+#ifdef GPIO_AF7_USART3
+    if(index == 2)return GPIO_AF7_USART3;
+#endif
+#ifdef GPIO_AF8_UART4
+    if(index == 3)return GPIO_AF8_UART4;
+#endif
+#ifdef GPIO_AF8_UART5
+    if(index == 4)return GPIO_AF8_UART5;
+#endif
+    return 0;
+}
+
 int uart_init(int fd, int tx, int rx, int flags){
     struct termios attr;
     int index = (fd>>8);
+    int af = uart_get_gpio_af(index);
 
     //clk enable
     switch(index){
@@ -215,8 +243,8 @@ int uart_init(int fd, int tx, int rx, int flags){
         default:return -1;
     }
     
-    gpio_init(tx, GPIO_MODE_AF_PP, GPIO_NOPULL);
-    gpio_init(rx, GPIO_MODE_INPUT, GPIO_NOPULL);
+    gpio_init_ex(tx, GPIO_MODE_AF_PP, GPIO_NOPULL, af);
+    gpio_init_ex(rx, GPIO_MODE_INPUT, GPIO_NOPULL, af);
 
     attr.c_cflag = flags;
     return uart_set_attr(fd, &attr);    

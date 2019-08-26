@@ -99,6 +99,7 @@ extern GPIO_TypeDef* gpio_ports_[];
 
 //gpio初始化  mode=GPIO_MODE_INPUT\GPIO_MODE_OUTPUT_PP\...  pull=GPIO_NOPULL\GPIO_PULLUP\GPIO_PULLDOWN
 int gpio_init(int fd, int mode, int pull);
+int gpio_init_ex(int fd, int mode, int pull, int af);
 
 //设置中断函数
 void gpio_set_irq(int fd, irq_handler func);

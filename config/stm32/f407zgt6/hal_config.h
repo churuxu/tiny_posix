@@ -5,7 +5,8 @@
 
 #define KEY1 GPIO_FD(PORTF, 9)
 
-
+#define SERIAL1 UART_FD(3)
+#define SERIAL2 UART_FD(5)
 
 void HAL_Config(){
     gpio_init(LED1, GPIO_MODE_OUTPUT_PP, GPIO_PULLUP);
@@ -13,8 +14,9 @@ void HAL_Config(){
     gpio_init(LED3, GPIO_MODE_OUTPUT_PP, GPIO_PULLUP);
 
     gpio_init(KEY1, GPIO_MODE_IT_RISING, 0);
-    //uart_init(UART_FD(2), B115200|CS8);
-   
+
+    uart_init(SERIAL1, UART3_DEFAULT_PINS, B9600|CS8);
+    uart_init(SERIAL2, UART5_DEFAULT_PINS, B9600|CS8);
 }
 
 
