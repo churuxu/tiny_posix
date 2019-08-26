@@ -181,16 +181,18 @@ static int uart_set_attr(int fd, const struct termios* attr){
     int baud;
     int stopbits;
     int parity;
+    int wordlen;
     int index = (fd>>8);
     UART_HandleTypeDef* uart = uart_get_handle(fd);   
     
     baud = ((attr->c_cflag & 0xffff) * 100);
     stopbits = (attr->c_cflag & CSTOPB)? UART_STOPBITS_2 : UART_STOPBITS_1;
     parity = (attr->c_cflag & PARENB)?((attr->c_cflag & PARODD)?UART_PARITY_ODD:UART_PARITY_EVEN):UART_PARITY_NONE;
-     
+    wordlen = (attr->c_cflag & PARENB)? UART_WORDLENGTH_9B : UART_WORDLENGTH_8B;
+
     uart->Instance = uarts_[index];
     uart->Init.BaudRate = baud;
-    uart->Init.WordLength = UART_WORDLENGTH_8B;
+    uart->Init.WordLength = wordlen;
     uart->Init.StopBits = stopbits;
     uart->Init.Parity = parity;
     uart->Init.Mode = UART_MODE_TX_RX;
@@ -262,6 +264,9 @@ int uart_config(int fd, int key, void* value){
     }
     return 0;
 }
+
+
+
 
 int uart_read(int fd, void* buf, int len){
     UART_HandleTypeDef* uart = uart_get_handle(fd);
