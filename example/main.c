@@ -32,7 +32,7 @@ void on_key(){
 }
 
 int main(){
-       //int port = SERIAL_PORT;
+    int port = SERIAL1;
 
     tiny_posix_init(); 
 
@@ -42,7 +42,7 @@ int main(){
         loop_leds();
         sleep(1);
         
-        //uart_write(port, "SOpen_beepE", 11);
+        uart_write(port, "hello", 5);
         //usleep(100000);
         //uart_write(port, "SClose_beepE", 12);
     }

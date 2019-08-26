@@ -117,8 +117,12 @@ int gpio_write(int fd, const void* buf, int len);
 //uart fd   id~3
 #define UART_FD(id) ((id-1)<<8|FD_TYPE_UART)
 
-//uart1 默认引脚
-#define UART1_DEFAULT_PINS GPIO_FD(PORTA, PIN9)
+//uart 默认引脚
+#define UART1_DEFAULT_PINS GPIO_FD(PORTA, 9),  GPIO_FD(PORTA, 10)
+#define UART2_DEFAULT_PINS GPIO_FD(PORTA, 2),  GPIO_FD(PORTA, 3)
+#define UART3_DEFAULT_PINS GPIO_FD(PORTB, 10), GPIO_FD(PORTB, 11)
+#define UART4_DEFAULT_PINS GPIO_FD(PORTC, 10), GPIO_FD(PORTC, 11)
+#define UART5_DEFAULT_PINS GPIO_FD(PORTC, 12), GPIO_FD(PORTD, 2)
 
 
 int uart_init(int fd, int txpin, int rxpin, int flags);
