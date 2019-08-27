@@ -5,6 +5,7 @@
 #define SERIAL1 UART_FD(1)
 #define SERIAL2 UART_FD(3)
 
+#define TEST_I2C1 I2C_FD(1)
 
 void HAL_Config(){
     gpio_init(LED1, GPIO_MODE_OUTPUT_PP, GPIO_PULLUP);
@@ -12,6 +13,8 @@ void HAL_Config(){
 
     uart_init(SERIAL1, UART1_DEFAULT_PINS, B9600|CS8);
     uart_init(SERIAL2, UART3_DEFAULT_PINS, B9600|CS8);
+
+    i2c_init(TEST_I2C1, I2C1_DEFAULT_PINS, 0x70, 0xA0);    
 }
 
 

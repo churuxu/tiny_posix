@@ -469,18 +469,19 @@ int spi_write(int fd, const void* buf, int len){
 
 //======================== I2C =============================
 
-I2C_TypeDef* i2cs_[] = {
+static I2C_TypeDef* i2cs_[] = {
     I2C1,
 #ifdef I2C2
     I2C2,
 #endif
 };
 
-I2C_HandleTypeDef i2c_handles_[sizeof(i2cs_)/sizeof(void*)];
+static I2C_HandleTypeDef i2c_handles_[sizeof(i2cs_)/sizeof(void*)];
 
 //对端地址
-uint16_t i2c_peers_[sizeof(i2cs_)/sizeof(void*)]; 
-
+static uint16_t i2c_peers_[sizeof(i2cs_)/sizeof(void*)]; 
+//读写地址
+static uint16_t i2c_memaddr_[sizeof(i2cs_)/sizeof(void*)];
 
 static I2C_HandleTypeDef* i2c_get_handle(int fd){
     int index = (fd>>8);    
@@ -504,6 +505,12 @@ int i2c_set_peer(int fd, int addr){
     return 0;
 }
 
+int i2c_set_offset(int fd, int off){
+    int index = (fd>>8);
+    i2c_memaddr_[index] = (uint16_t)off;
+    return 0;
+}
+
 int i2c_set_local(int fd, int addr){
     int index = (fd>>8);
     I2C_HandleTypeDef* i2c = i2c_get_handle(fd); 
@@ -516,7 +523,7 @@ int i2c_set_local(int fd, int addr){
     i2c->Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
     i2c->Init.NoStretchMode   = I2C_NOSTRETCH_DISABLE;
     i2c->Init.OwnAddress1     = (uint8_t)(addr & 0xff);
-    i2c->Init.OwnAddress2     = (uint8_t)((addr & 0xff00)>>8);
+    i2c->Init.OwnAddress2     = 0xff;
 
     if(HAL_OK != HAL_I2C_Init(i2c)){
         return -1;
@@ -526,7 +533,7 @@ int i2c_set_local(int fd, int addr){
 
 
 //初始化i2c（主机）
-int i2c_init(int fd, int sclpin, int sdapin, int flags){
+int i2c_init(int fd, int sclpin, int sdapin, int flags, int peeraddr){
     int index = (fd>>8);
     int af = i2c_get_gpio_af(index); 
 
@@ -542,38 +549,68 @@ int i2c_init(int fd, int sclpin, int sdapin, int flags){
     gpio_init_ex(sclpin, GPIO_MODE_AF_OD, GPIO_PULLUP, af);
     gpio_init_ex(sdapin, GPIO_MODE_AF_OD, GPIO_PULLUP, af);
 
+    i2c_set_peer(fd, peeraddr);
     return i2c_set_local(fd, flags);
+}
+
+int i2c_test(int fd){
+    uint16_t peer;
+    int index = (fd>>8);    
+    int timeout = 1000;
+    I2C_HandleTypeDef* i2c = i2c_get_handle(fd); 
+    if(!i2c)return -1;
+    peer = i2c_peers_[index];
+    if(HAL_OK == HAL_I2C_IsDeviceReady(i2c, peer, 1, timeout)){
+        return 0;
+    }   
+    return -2; 
 }
 
 //read/write 函数
 int i2c_read(int fd, void* buf, int len){
     uint16_t peer;
+    uint16_t mem;
+    uint16_t memsz = 1;
     int index = (fd>>8);
     int recved = 0;
     int timeout ;
     I2C_HandleTypeDef* i2c = i2c_get_handle(fd); 
     if(!i2c)return -1;
-    timeout = 2000;
+    timeout = 5000;
     peer = i2c_peers_[index];
+    mem = i2c_memaddr_[index];
+    if(HAL_OK == HAL_I2C_Mem_Read(i2c, peer, mem, memsz, (uint8_t*)buf, len, timeout)){
+        recved = len;
+    }    
+    /*
     while(recved < len){
         if(HAL_OK != HAL_I2C_Master_Receive(i2c, peer, (uint8_t*)buf + recved, 1, timeout)){
             return recved;
         }
         recved ++;
         timeout = 32;
-    }        
+    } */       
     return recved;
 }
 
 int i2c_write(int fd, const void* buf, int len){
     uint16_t peer;
+    uint16_t mem;
+    uint16_t memsz = 1;    
+    int timeout ;
     int index = (fd>>8);
     I2C_HandleTypeDef* i2c = i2c_get_handle(fd); 
     if(!i2c)return -1; 
+    timeout = 5000;
     peer = i2c_peers_[index];
+    mem = i2c_memaddr_[index];
+    if(HAL_OK == HAL_I2C_Mem_Write(i2c, peer, mem, memsz, (uint8_t*)buf, len, timeout)){
+        return len;
+    }    
+    /*
     if(HAL_OK == HAL_I2C_Master_Transmit(i2c, peer, (uint8_t*)buf, len, 2000)){
         return len;
-    }
+    }*/
     return -1;
 }
 

@@ -54,6 +54,28 @@ void test_spi(){
 }
 #endif
 
+#ifdef TEST_I2C1
+void test_i2c(){
+    int ret;
+    char buf[16];
+    const char* msg = "hi!";
+
+    sleep(1);
+
+    if(i2c_test(TEST_I2C1)){
+        uart_write(SERIAL2, "not i2c", 6);
+        return;
+    }
+
+    ret = i2c_write(TEST_I2C1, msg, 1);
+    sleep(1);
+    ret = i2c_read(TEST_I2C1, buf, 1);
+    if(ret>0){
+        uart_write(SERIAL2, buf, ret);
+    }
+}
+
+#endif
 
 void test_sleep_mode(){
     char buf[64];
@@ -92,8 +114,11 @@ int main(){
 #ifdef TEST_SPI1
     test_spi();
 #endif
+#ifdef TEST_I2C1
+    test_i2c();
+#endif
 
-    test_sleep_mode();
+    //test_sleep_mode();
 
     while(1){
         loop_leds();

@@ -171,12 +171,17 @@ int spi_write(int fd, const void* buf, int len);
 
 
 //初始化i2c（主机）
-int i2c_init(int fd, int sclpin, int sdapin, int addr_and_flags);
+int i2c_init(int fd, int sclpin, int sdapin, int addr_and_flags, int peeraddr);
 
 //设置之后通信的对端地址（从机地址）
 int i2c_set_peer(int fd, int addr);
 //设置本机地址
 int i2c_set_local(int fd, int addr);
+
+//设置读写地址
+int i2c_set_offset(int fd, int offset);
+
+int i2c_test(int fd);
 
 //read/write 函数
 int i2c_read(int fd, void* buf, int len);
