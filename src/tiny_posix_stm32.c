@@ -192,23 +192,40 @@ static int uart_get_gpio_af(int index){
 }
 
 
-static int uart_get_attr(int fd, struct termios* attr){
+static int uart_get_flags(int fd){
+    int baud;
+    int stopbits;
+    int parity;
+     
+    UART_HandleTypeDef* uart = uart_get_handle(fd);
+    if(!uart)return 0;
 
+    baud = (uart->Init.BaudRate / 100);
+    if(uart->Init.Parity == UART_PARITY_ODD){
+        parity = PARENB | PARODD;
+    }else if(uart->Init.Parity == UART_PARITY_EVEN){
+        parity = PARENB;
+    }else{
+        parity = 0;
+    }
+    stopbits = (uart->Init.StopBits == UART_STOPBITS_2)?CSTOPB:0;
 
-    return 0;
+    return baud|CS8|parity|stopbits;
 }
-static int uart_set_attr(int fd, const struct termios* attr){
+
+int uart_set_flags(int fd, int flags){
     int baud;
     int stopbits;
     int parity;
     int wordlen;
     int index = (fd>>8);
     UART_HandleTypeDef* uart = uart_get_handle(fd);   
-    
-    baud = ((attr->c_cflag & 0xffff) * 100);
-    stopbits = (attr->c_cflag & CSTOPB)? UART_STOPBITS_2 : UART_STOPBITS_1;
-    parity = (attr->c_cflag & PARENB)?((attr->c_cflag & PARODD)?UART_PARITY_ODD:UART_PARITY_EVEN):UART_PARITY_NONE;
-    wordlen = (attr->c_cflag & PARENB)? UART_WORDLENGTH_9B : UART_WORDLENGTH_8B;
+    if(!uart)return -1;
+
+    baud = ((flags & 0xffff) * 100);
+    stopbits = (flags & CSTOPB)? UART_STOPBITS_2 : UART_STOPBITS_1;
+    parity = (flags & PARENB)?((flags & PARODD)?UART_PARITY_ODD:UART_PARITY_EVEN):UART_PARITY_NONE;
+    wordlen = (flags & PARENB)? UART_WORDLENGTH_9B : UART_WORDLENGTH_8B;
 
     uart->Instance = uarts_[index];
     uart->Init.BaudRate = baud;
@@ -227,8 +244,7 @@ static int uart_set_attr(int fd, const struct termios* attr){
 
 
 
-int uart_init(int fd, int tx, int rx, int flags){
-    struct termios attr;
+int uart_init(int fd, int tx, int rx, int flags){    
     int index = (fd>>8);
     int af = uart_get_gpio_af(index);
 
@@ -250,9 +266,8 @@ int uart_init(int fd, int tx, int rx, int flags){
     
     gpio_init_ex(tx, GPIO_MODE_AF_PP, GPIO_NOPULL, af);
     gpio_init_ex(rx, GPIO_MODE_INPUT, GPIO_NOPULL, af);
-
-    attr.c_cflag = flags;
-    return uart_set_attr(fd, &attr);    
+    
+    return uart_set_flags(fd, flags);    
 }
 
 int uart_config(int fd, int key, void* value){
@@ -297,20 +312,22 @@ int uart_write(int fd, const void* buf, int len){
 
 
 int _tp_cfsetispeed(struct termios* attr, speed_t t){
-    attr->c_cflag &= 0x0000;
+    attr->c_cflag &= 0xffff0000;
     attr->c_cflag |= t;
     return 0;
 }
 int _tp_cfsetospeed(struct termios* attr, speed_t t){
-    attr->c_cflag &= 0x0000;
+    attr->c_cflag &= 0xffff0000;
     attr->c_cflag |= t;
     return 0;    
 }
 int _tp_tcgetattr(int fd, struct termios* attr){
-    return uart_get_attr(fd, attr);
+    int flag = uart_get_flags(fd);
+    attr->c_cflag = flag;
+    return (flag == 0);
 }
 int _tp_tcsetattr(int fd, int opt, const struct termios* attr){
-    return uart_set_attr(fd, attr);
+    return uart_set_flags(fd, attr->c_cflag);
 }
 //=====================================================
 
@@ -372,7 +389,7 @@ static int spi_set_flags(int fd, int flags){
     return 0;    
 }
 
-int spi_init(int fd, int clkpin, int misopin, int mosipin,  int flags){
+int spi_init(int fd, int clkpin, int misopin, int mosipin){
     int index = (fd>>8);
     int af = spi_get_gpio_af(index); 
 
@@ -392,7 +409,7 @@ int spi_init(int fd, int clkpin, int misopin, int mosipin,  int flags){
     gpio_init_ex(misopin, GPIO_MODE_INPUT, GPIO_NOPULL, af);
     gpio_init_ex(mosipin, GPIO_MODE_AF_PP, GPIO_NOPULL, af);        
 
-    return spi_set_flags(fd, flags);
+    return spi_set_flags(fd, 0);
 }
 
 
@@ -430,9 +447,123 @@ int spi_write(int fd, const void* buf, int len){
     return -1;
 }
 
-//=====================================================
+//======================== I2C =============================
+
+I2C_TypeDef* i2cs_[] = {
+    I2C1,
+#ifdef I2C2
+    I2C2,
+#endif
+};
+
+I2C_HandleTypeDef i2c_handles_[sizeof(i2cs_)/sizeof(void*)];
+
+//对端地址
+uint16_t i2c_peers_[sizeof(i2cs_)/sizeof(void*)]; 
 
 
+static I2C_HandleTypeDef* i2c_get_handle(int fd){
+    int index = (fd>>8);    
+    return &(i2c_handles_[index]);
+}
+
+
+static int i2c_get_gpio_af(int index){
+#ifdef GPIO_AF4_I2C1
+    if(index == 0)return GPIO_AF4_I2C1;
+#endif
+#ifdef GPIO_AF4_I2C2
+    if(index == 1)return GPIO_AF4_I2C2;
+#endif
+    return 0;
+}
+
+int i2c_set_peer(int fd, int addr){
+    int index = (fd>>8);
+    i2c_peers_[index] = (uint16_t)addr;
+    return 0;
+}
+
+int i2c_set_local(int fd, int addr){
+    int index = (fd>>8);
+    I2C_HandleTypeDef* i2c = i2c_get_handle(fd); 
+
+    i2c->Instance             = i2cs_[index];  
+    i2c->Init.AddressingMode  = I2C_ADDRESSINGMODE_7BIT;
+    i2c->Init.ClockSpeed      = 400000;
+    i2c->Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+    i2c->Init.DutyCycle       = I2C_DUTYCYCLE_2;
+    i2c->Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+    i2c->Init.NoStretchMode   = I2C_NOSTRETCH_DISABLE;
+    i2c->Init.OwnAddress1     = (uint8_t)(addr & 0xff);
+    i2c->Init.OwnAddress2     = (uint8_t)((addr & 0xff00)>>8);
+
+    if(HAL_OK != HAL_I2C_Init(i2c)){
+        return -1;
+    }
+    return 0;    
+}
+
+
+//初始化i2c（主机）
+int i2c_init(int fd, int sclpin, int sdapin, int flags){
+    int index = (fd>>8);
+    int af = i2c_get_gpio_af(index); 
+
+    //clk enable
+    switch(index){
+        case 0: __HAL_RCC_I2C1_CLK_ENABLE(); break;
+#ifdef I2C2
+        case 1: __HAL_RCC_I2C2_CLK_ENABLE(); break;
+#endif
+        default:return -1;
+    }
+
+    gpio_init_ex(sclpin, GPIO_MODE_AF_OD, GPIO_PULLUP, af);
+    gpio_init_ex(sdapin, GPIO_MODE_AF_OD, GPIO_PULLUP, af);
+
+    return i2c_set_local(fd, flags);
+}
+
+//read/write 函数
+int i2c_read(int fd, void* buf, int len){
+    uint16_t peer;
+    int index = (fd>>8);
+    int recved = 0;
+    int timeout ;
+    I2C_HandleTypeDef* i2c = i2c_get_handle(fd); 
+    if(!i2c)return -1;
+    timeout = 2000;
+    peer = i2c_peers_[index];
+    while(recved < len){
+        if(HAL_OK != HAL_I2C_Master_Receive(i2c, peer, (uint8_t*)buf + recved, 1, timeout)){
+            return recved;
+        }
+        recved ++;
+        timeout = 32;
+    }        
+    return recved;
+}
+
+int i2c_write(int fd, const void* buf, int len){
+    uint16_t peer;
+    int index = (fd>>8);
+    I2C_HandleTypeDef* i2c = i2c_get_handle(fd); 
+    if(!i2c)return -1; 
+    peer = i2c_peers_[index];
+    if(HAL_OK == HAL_I2C_Master_Transmit(i2c, peer, (uint8_t*)buf, len, 2000)){
+        return len;
+    }
+    return -1;
+}
+
+
+
+
+
+
+
+//======================== SYS =============================
 unsigned int _tp_sleep(unsigned int seconds){
     HAL_Delay(seconds * 1000);
     return 0;

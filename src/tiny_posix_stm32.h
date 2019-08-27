@@ -20,7 +20,7 @@ extern "C" {
 #define FD_TYPE_GPIO 0x01
 #define FD_TYPE_UART 0x02
 #define FD_TYPE_SPI  0x03
-
+#define FD_TYPE_I2C  0x04
 
 //gpio port names
 #define PORTA 0x00000000
@@ -129,6 +129,9 @@ int gpio_write(int fd, const void* buf, int len);
 //初始化串口， flags示例 B9600|CS8
 int uart_init(int fd, int txpin, int rxpin, int flags);
 
+//修改串口参数， flags示例 B9600|CS8
+int uart_set_flags(int fd, int flags);
+
 //read/write 函数
 int uart_read(int fd, void* buf, int len);
 int uart_write(int fd, const void* buf, int len);
@@ -144,8 +147,9 @@ int uart_write(int fd, const void* buf, int len);
 #define SPI2_DEFAULT_PINS  GPIO_FD(PORTB, 13), GPIO_FD(PORTB, 14), GPIO_FD(PORTB, 15)
 #define SPI3_DEFAULT_PINS  GPIO_FD(PORTB, 3),  GPIO_FD(PORTB, 4),  GPIO_FD(PORTB, 5)
 
-//初始化spi，flags示例 
-int spi_init(int fd, int clkpin, int misopin, int mosipin, int flags);
+
+//初始化spi(主机)，flags=0
+int spi_init(int fd, int clkpin, int misopin, int mosipin);
 
 //写len个字节，并读len个字节， 成功返回len， 失败返回<=0
 int spi_io(int fd, const void* out, void* in, int len);
@@ -154,6 +158,29 @@ int spi_io(int fd, const void* out, void* in, int len);
 int spi_read(int fd, void* buf, int len);
 int spi_write(int fd, const void* buf, int len);
 
+
+//============================= i2c =============================
+
+//i2c fd   id 1~2
+#define I2C_FD(id) ((id-1)<<8|FD_TYPE_I2C)
+
+
+//i2c 默认引脚 (SCL SDA)
+#define I2C1_DEFAULT_PINS  GPIO_FD(PORTB, 6),  GPIO_FD(PORTB, 7)
+#define I2C2_DEFAULT_PINS  GPIO_FD(PORTB, 13), GPIO_FD(PORTB, 14)
+
+
+//初始化i2c（主机）
+int i2c_init(int fd, int sclpin, int sdapin, int addr_and_flags);
+
+//设置之后通信的对端地址（从机地址）
+int i2c_set_peer(int fd, int addr);
+//设置本机地址
+int i2c_set_local(int fd, int addr);
+
+//read/write 函数
+int i2c_read(int fd, void* buf, int len);
+int i2c_write(int fd, const void* buf, int len);
 
 #ifdef __cplusplus
 }

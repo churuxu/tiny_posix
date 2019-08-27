@@ -28,7 +28,7 @@ void loop_leds(){
 }
 
 
-
+#ifdef TEST_SPI1
 void test_spi(){
     uint8_t cmd1[5] = {0x90,0,0,0,0};
     uint8_t cmd2[5] = {0x9f,0,0,0,0};
@@ -51,9 +51,8 @@ void test_spi(){
     if(ret>0){        
         uart_write(SERIAL2, buf, ret);
     }
-
 }
-
+#endif
 
 void on_key(){
     gpio_set(LED1);
