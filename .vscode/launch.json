@@ -69,10 +69,14 @@
             "preLaunchTask": "StartGdbServer",
             "setupCommands": [ 
                 {                   
-                    "text": "target remote localhost:2331"                    
+                    "text": "target remote localhost:2331",
+                    "description": "set remote",
+                    "ignoreFailures": false                 
                 },     
                 {                   
-                    "text": "monitor reset"                    
+                    "text": "monitor reset",
+                    "description": "reset",
+                    "ignoreFailures": false                    
                 }
             ]         
         }

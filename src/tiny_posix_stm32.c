@@ -269,18 +269,24 @@ int uart_config(int fd, int key, void* value){
 
 
 int uart_read(int fd, void* buf, int len){
+    int recved = 0;
+    int timeout ;
     UART_HandleTypeDef* uart = uart_get_handle(fd);
     if(!uart)return -1;
-    /*  
-    if(HAL_OK == HAL_UART_Receive(uart, (uint8_t*)buf, len, 3000)){
-        return len;
-    } */      
-    return 0;
+    timeout = 2000;
+    while(recved < len){
+        if(HAL_OK != HAL_UART_Receive(uart, (uint8_t*)buf + recved, 1, timeout)){
+            return recved;
+        }
+        recved ++;
+        timeout = 32;
+    }        
+    return recved;
 }
 int uart_write(int fd, const void* buf, int len){
     UART_HandleTypeDef* uart = uart_get_handle(fd); 
     if(!uart)return -1; 
-    if(HAL_OK == HAL_UART_Transmit(uart, (uint8_t*)buf, len, 3000)){
+    if(HAL_OK == HAL_UART_Transmit(uart, (uint8_t*)buf, len, 2000)){
         return len;
     }
     return -1;

@@ -32,21 +32,24 @@ void on_key(){
 }
 
 int main(){
+    char buf[64];
     int port1 = SERIAL1;
     int port2 = SERIAL2;
-    
+    int ret;
+
     tiny_posix_init(); 
 
     gpio_set_irq(KEY1, on_key);
     
     while(1){
         loop_leds();
-        sleep(1);
+                
+        uart_write(port1, "hello", 5);        
         
-        uart_write(port1, "hello", 5);
-        uart_write(port2, "world", 5);
-        //usleep(100000);
-        //uart_write(port, "SClose_beepE", 12);
+        ret = uart_read(port2, buf, 64);
+        if(ret>0){
+            uart_write(port2, buf, ret);
+        }
     }
 
     return 0;

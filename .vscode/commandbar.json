@@ -1,0 +1,27 @@
+{
+    "skipTerminateQuickPick": true,
+    "skipSwitchToOutput": false,
+    "skipErrorMessage": true,
+    "commands": [
+        {
+            "text": "Configure",            
+            "commandType": "palette",
+            "command": "workbench.action.tasks.runTask|Configure"
+        },
+        {
+            "text": "Build",            
+            "commandType": "palette",
+            "command": "workbench.action.tasks.runTask|Build"
+        },
+        {
+            "text": "Flash",            
+            "commandType": "palette",
+            "command": "workbench.action.tasks.runTask|Flash"
+        },
+        {
+            "text": "Clean",            
+            "commandType": "palette",
+            "command": "workbench.action.tasks.runTask|Clean"
+        }		
+    ]
+}
