@@ -39,7 +39,8 @@ static irq_handler gpio_irqs_[16];
 extern void SystemClock_Config();
 extern void HAL_Config();
 
-static void gpio_clock_init(){
+static void default_clock_init(){
+    __HAL_RCC_PWR_CLK_ENABLE();
     __HAL_RCC_GPIOA_CLK_ENABLE();
     __HAL_RCC_GPIOB_CLK_ENABLE();   
     __HAL_RCC_GPIOC_CLK_ENABLE();
@@ -61,7 +62,7 @@ static void gpio_clock_init(){
 void tiny_posix_init(){    
     HAL_Init();
 
-    gpio_clock_init();
+    default_clock_init();
     
     SystemClock_Config();
 
@@ -248,18 +249,37 @@ int uart_init(int fd, int tx, int rx, int flags){
     int index = (fd>>8);
     int af = uart_get_gpio_af(index);
 
-    //clk enable
     switch(index){
-        case 0: __HAL_RCC_USART1_CLK_ENABLE(); break;
-        case 1: __HAL_RCC_USART2_CLK_ENABLE(); break;
+        case 0: 
+            __HAL_RCC_USART1_CLK_ENABLE();
+            HAL_NVIC_EnableIRQ(USART1_IRQn);
+            HAL_NVIC_SetPriority(USART1_IRQn,0,0);
+            break;
+        case 1: 
+            __HAL_RCC_USART2_CLK_ENABLE();
+            HAL_NVIC_EnableIRQ(USART2_IRQn);
+            HAL_NVIC_SetPriority(USART2_IRQn,0,0);
+            break;
 #ifdef USART3        
-        case 2: __HAL_RCC_USART3_CLK_ENABLE(); break;
+        case 2: 
+            __HAL_RCC_USART3_CLK_ENABLE();
+            HAL_NVIC_EnableIRQ(USART3_IRQn);
+            HAL_NVIC_SetPriority(USART3_IRQn,0,0);
+            break;
 #endif
 #ifdef UART4        
-        case 3: __HAL_RCC_UART4_CLK_ENABLE(); break;
+        case 3: 
+            __HAL_RCC_UART4_CLK_ENABLE();
+            HAL_NVIC_EnableIRQ(UART4_IRQn);
+            HAL_NVIC_SetPriority(UART4_IRQn,0,0);
+            break;
 #endif
 #ifdef UART5 
-        case 4: __HAL_RCC_UART5_CLK_ENABLE(); break;
+        case 4: 
+            __HAL_RCC_USART5_CLK_ENABLE();
+            HAL_NVIC_EnableIRQ(UART5_IRQn);
+            HAL_NVIC_SetPriority(UART5_IRQn,0,0);
+            break;
 #endif        
         default:return -1;
     }
@@ -573,6 +593,9 @@ unsigned int _tp_usleep(unsigned int micro_seconds){
     return 0;
 }
 
+_tp_clock_t _tp_clock(){
+    return HAL_GetTick();
+}
 
 
 
@@ -622,4 +645,5 @@ void EXTI15_10_IRQHandler(){
     HANDLE_GPIO_IRQ(GPIO_PIN_14, 14);
     HANDLE_GPIO_IRQ(GPIO_PIN_15, 15);
 }
+
 

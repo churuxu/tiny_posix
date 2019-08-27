@@ -54,6 +54,27 @@ void test_spi(){
 }
 #endif
 
+
+void test_sleep_mode(){
+    char buf[64];
+    int t0 = HAL_GetTick();
+    int c0 = SysTick->VAL;
+    int t1, c1, len;
+    
+    sleep(2);
+    len = sprintf(buf, "enter sleep");
+    uart_write(SERIAL2, buf, len);
+
+    HAL_SuspendTick();    
+    HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI);     
+    HAL_ResumeTick();
+    t1 = HAL_GetTick();
+    c1 = SysTick->VAL;
+    len = sprintf(buf, "leave sleep %d~%d %d~%d",t0,t1,c0,c1);
+    uart_write(SERIAL2, buf, len);
+}
+
+
 void on_key(){
     gpio_set(LED1);
 }
@@ -71,6 +92,8 @@ int main(){
 #ifdef TEST_SPI1
     test_spi();
 #endif
+
+    test_sleep_mode();
 
     while(1){
         loop_leds();

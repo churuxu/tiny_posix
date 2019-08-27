@@ -46,7 +46,11 @@ extern "C" {
 typedef int _tp_ssize_t;
 typedef uint16_t _tp_speed_t;
 typedef uint64_t _tp_off_t;
+#if __SIZE_OF_POINTER__ == 64 
 typedef uint64_t _tp_clock_t;
+#else
+typedef uint32_t _tp_clock_t;
+#endif
 typedef uint64_t _tp_time_t;
 typedef int _tp_socklen_t;
 typedef struct _tp_DIR _tp_DIR;
