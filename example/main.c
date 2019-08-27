@@ -27,6 +27,34 @@ void loop_leds(){
     }
 }
 
+
+
+void test_spi(){
+    uint8_t cmd1[5] = {0x90,0,0,0,0};
+    uint8_t cmd2[5] = {0x9f,0,0,0,0};
+    uint8_t buf[8];
+    int ret;
+    gpio_reset(TEST_SPI1_NSS);
+    //spi_write(TEST_SPI1, cmd, 1);
+    //ret = spi_read(TEST_SPI1, buf, 16);
+    ret = spi_io(TEST_SPI1, cmd1, buf, 5);    
+    gpio_set(TEST_SPI1_NSS);
+    if(ret>0){        
+        uart_write(SERIAL2, buf, ret);
+    }
+
+    sleep(1);
+
+    gpio_reset(TEST_SPI1_NSS);    
+    ret = spi_io(TEST_SPI1, cmd2, buf, 5);    
+    gpio_set(TEST_SPI1_NSS);
+    if(ret>0){        
+        uart_write(SERIAL2, buf, ret);
+    }
+
+}
+
+
 void on_key(){
     gpio_set(LED1);
 }
@@ -41,6 +69,10 @@ int main(){
 
     gpio_set_irq(KEY1, on_key);
     
+#ifdef TEST_SPI1
+    test_spi();
+#endif
+
     while(1){
         loop_leds();
                 

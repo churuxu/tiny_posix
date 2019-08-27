@@ -114,25 +114,45 @@ int gpio_write(int fd, const void* buf, int len);
 #define gpio_reset(fd) HAL_GPIO_WritePin(GPIO_FD_GET_PORT(fd), GPIO_FD_GET_PIN(fd), (0 != GPIO_FD_IS_REVERSE(fd)))
 #define gpio_toggle(fd) HAL_GPIO_TogglePin(GPIO_FD_GET_PORT(fd), GPIO_FD_GET_PIN(fd))
 
+//============================= uart =============================
 
-//uart fd   id~3
+//uart fd   id 1~5
 #define UART_FD(id) ((id-1)<<8|FD_TYPE_UART)
 
-//uart 默认引脚
+//uart 默认引脚 (TX RX)
 #define UART1_DEFAULT_PINS GPIO_FD(PORTA, 9),  GPIO_FD(PORTA, 10)
 #define UART2_DEFAULT_PINS GPIO_FD(PORTA, 2),  GPIO_FD(PORTA, 3)
 #define UART3_DEFAULT_PINS GPIO_FD(PORTB, 10), GPIO_FD(PORTB, 11)
 #define UART4_DEFAULT_PINS GPIO_FD(PORTC, 10), GPIO_FD(PORTC, 11)
 #define UART5_DEFAULT_PINS GPIO_FD(PORTC, 12), GPIO_FD(PORTD, 2)
 
-
+//初始化串口， flags示例 B9600|CS8
 int uart_init(int fd, int txpin, int rxpin, int flags);
 
 //read/write 函数
 int uart_read(int fd, void* buf, int len);
 int uart_write(int fd, const void* buf, int len);
 
+
+//============================= spi =============================
+
+//spi fd   id 1~3
 #define SPI_FD(id) ((id-1)<<8|FD_TYPE_SPI)
+
+//spi 默认引脚 (CLK MISO MOSI)
+#define SPI1_DEFAULT_PINS  GPIO_FD(PORTA, 5),  GPIO_FD(PORTA, 6),  GPIO_FD(PORTA, 7)
+#define SPI2_DEFAULT_PINS  GPIO_FD(PORTB, 13), GPIO_FD(PORTB, 14), GPIO_FD(PORTB, 15)
+#define SPI3_DEFAULT_PINS  GPIO_FD(PORTB, 3),  GPIO_FD(PORTB, 4),  GPIO_FD(PORTB, 5)
+
+//初始化spi，flags示例 
+int spi_init(int fd, int clkpin, int misopin, int mosipin, int flags);
+
+//写len个字节，并读len个字节， 成功返回len， 失败返回<=0
+int spi_io(int fd, const void* out, void* in, int len);
+
+//read/write 函数
+int spi_read(int fd, void* buf, int len);
+int spi_write(int fd, const void* buf, int len);
 
 
 #ifdef __cplusplus

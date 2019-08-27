@@ -172,6 +172,26 @@ static UART_HandleTypeDef* uart_get_handle(int fd){
     return &(uart_handles_[index]);
 }
 
+static int uart_get_gpio_af(int index){
+#ifdef GPIO_AF7_USART1
+    if(index == 0)return GPIO_AF7_USART1;
+#endif
+#ifdef GPIO_AF7_USART2
+    if(index == 1)return GPIO_AF7_USART2;
+#endif
+#ifdef GPIO_AF7_USART3
+    if(index == 2)return GPIO_AF7_USART3;
+#endif
+#ifdef GPIO_AF8_UART4
+    if(index == 3)return GPIO_AF8_UART4;
+#endif
+#ifdef GPIO_AF8_UART5
+    if(index == 4)return GPIO_AF8_UART5;
+#endif
+    return 0;
+}
+
+
 static int uart_get_attr(int fd, struct termios* attr){
 
 
@@ -205,24 +225,7 @@ static int uart_set_attr(int fd, const struct termios* attr){
 }
 
 
-static int uart_get_gpio_af(int index){
-#ifdef GPIO_AF7_USART1
-    if(index == 0)return GPIO_AF7_USART1;
-#endif
-#ifdef GPIO_AF7_USART2
-    if(index == 1)return GPIO_AF7_USART2;
-#endif
-#ifdef GPIO_AF7_USART3
-    if(index == 2)return GPIO_AF7_USART3;
-#endif
-#ifdef GPIO_AF8_UART4
-    if(index == 3)return GPIO_AF8_UART4;
-#endif
-#ifdef GPIO_AF8_UART5
-    if(index == 4)return GPIO_AF8_UART5;
-#endif
-    return 0;
-}
+
 
 int uart_init(int fd, int tx, int rx, int flags){
     struct termios attr;
@@ -325,13 +328,107 @@ SPI_TypeDef* spis_[] = {
 };
 
 
-SPI_HandleTypeDef spi_handles_[4];
+SPI_HandleTypeDef spi_handles_[sizeof(spis_)/sizeof(void*)];
 
-int spi_init(int fd){
-    return 0;
+static SPI_HandleTypeDef* spi_get_handle(int fd){
+    int index = (fd>>8);    
+    return &(spi_handles_[index]);
 }
 
 
+static int spi_get_gpio_af(int index){
+#ifdef GPIO_AF5_SPI1
+    if(index == 0)return GPIO_AF5_SPI1;
+#endif
+#ifdef GPIO_AF5_SPI2
+    if(index == 1)return GPIO_AF5_SPI2;
+#endif
+#ifdef GPIO_AF5_SPI3
+    if(index == 2)return GPIO_AF5_SPI3;
+#endif
+    return 0;
+}
+
+static int spi_set_flags(int fd, int flags){
+    int index = (fd>>8);
+    SPI_HandleTypeDef* spi = spi_get_handle(fd); 
+
+    spi->Instance = spis_[index];
+    spi->Init.Mode = SPI_MODE_MASTER;
+    spi->Init.Direction = SPI_DIRECTION_2LINES;
+    spi->Init.DataSize = SPI_DATASIZE_8BIT;
+    spi->Init.CLKPolarity = SPI_POLARITY_LOW;
+    spi->Init.CLKPhase = SPI_PHASE_1EDGE;
+    spi->Init.NSS = SPI_NSS_SOFT;
+    spi->Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_8;
+    spi->Init.FirstBit = SPI_FIRSTBIT_MSB;
+    spi->Init.TIMode = SPI_TIMODE_DISABLE;
+    spi->Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+    spi->Init.CRCPolynomial = 10;
+
+    if(HAL_OK != HAL_SPI_Init(spi)){
+        return -1;
+    }
+    return 0;    
+}
+
+int spi_init(int fd, int clkpin, int misopin, int mosipin,  int flags){
+    int index = (fd>>8);
+    int af = spi_get_gpio_af(index); 
+
+    //clk enable
+    switch(index){
+        case 0: __HAL_RCC_SPI1_CLK_ENABLE(); break;
+#ifdef SPI2          
+        case 1: __HAL_RCC_SPI2_CLK_ENABLE(); break;
+#endif
+#ifdef SPI3       
+        case 2: __HAL_RCC_SPI3_CLK_ENABLE(); break;
+#endif  
+        default:return -1;
+    }
+
+    gpio_init_ex(clkpin,  GPIO_MODE_AF_PP, GPIO_NOPULL, af);
+    gpio_init_ex(misopin, GPIO_MODE_INPUT, GPIO_NOPULL, af);
+    gpio_init_ex(mosipin, GPIO_MODE_AF_PP, GPIO_NOPULL, af);        
+
+    return spi_set_flags(fd, flags);
+}
+
+
+int spi_io(int fd, const void* out, void* in, int len){
+    SPI_HandleTypeDef* spi = spi_get_handle(fd); 
+    if(!spi)return -1;
+    if(HAL_OK == HAL_SPI_TransmitReceive(spi, (uint8_t*)out, (uint8_t*)in, len, 640)){
+        return len;
+    }
+    return -1;   
+}
+
+int spi_read(int fd, void* buf, int len){
+    int recved = 0;
+    int timeout ;
+    SPI_HandleTypeDef* spi = spi_get_handle(fd); 
+    if(!spi)return -1;
+    timeout = 320;
+    while(recved < len){
+        if(HAL_OK != HAL_SPI_Receive(spi, (uint8_t*)buf + recved, 1, timeout)){
+            return recved;
+        }
+        recved ++;
+        timeout = 16;
+    }        
+    return recved;    
+}
+
+int spi_write(int fd, const void* buf, int len){
+    SPI_HandleTypeDef* spi = spi_get_handle(fd); 
+    if(!spi)return -1; 
+    if(HAL_OK == HAL_SPI_Transmit(spi, (uint8_t*)buf, len, 320)){
+        return len;
+    }
+    return -1;
+}
 
 //=====================================================
 
