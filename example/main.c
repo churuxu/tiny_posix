@@ -1,26 +1,19 @@
 #include "tiny_posix.h"
-#include "hal_config.h"
 
-static int leds_[] = {
-    LED1,
-#ifdef LED2
-    LED2,
-#endif    
-#ifdef LED3
-    LED3,
-#endif 
-};
+static int leds_[8];
+static int ledcount_;
 
 void loop_leds(){
     static int on = 1;
-    static int cur = 0;    
+    static int cur = 0; 
+    if(!ledcount_) return ;  
     if(on){
         gpio_set(leds_[cur]);
     }else{
         gpio_reset(leds_[cur]);
     }
     cur ++;
-    if(cur==(sizeof(leds_)/4)){
+    if(cur == ledcount_){
         cur = 0;
         on = (on == 0);
     }
@@ -75,7 +68,7 @@ void test_i2c(){
 }
 
 #endif
-
+/*
 void test_sleep_mode(){
     char buf[64];
     int t0 = HAL_GetTick();
@@ -84,7 +77,7 @@ void test_sleep_mode(){
     
     sleep(2);
     len = sprintf(buf, "enter sleep");
-    uart_write(SERIAL2, buf, len);
+    //printf(SERIAL2, buf, len);
 
     HAL_SuspendTick();    
     HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI);     
@@ -92,22 +85,39 @@ void test_sleep_mode(){
     t1 = HAL_GetTick();
     c1 = SysTick->VAL;
     len = sprintf(buf, "leave sleep %d~%d %d~%d",t0,t1,c0,c1);
-    uart_write(SERIAL2, buf, len);
+    //uart_write(SERIAL2, buf, len);
 }
-
+*/
 
 void on_key(){
-    gpio_set(LED1);
+    //gpio_set(LED1);
 }
 
+void test_loop_led(){
+    char buf[64];
+    int i, fd;
+    //open leds
+    for(i=0;i<8;i++){
+        snprintf(buf, 64, "/leds/led%d",i);
+        fd = open(buf, O_WRONLY);
+        if(fd>=0){
+            leds_[i] = fd;
+            ledcount_ ++;
+        }
+    }
 
+    while(1){
+        loop_leds();
+        sleep(1);
+    }
+}
 
 int main(){
     char buf[64];    
-    int ret ;
+    int ret;
    
 
-    gpio_set_irq(KEY1, on_key);
+    //gpio_set_irq(KEY1, on_key);
     
 #ifdef TEST_SPI1
     test_spi();
@@ -115,7 +125,7 @@ int main(){
 #ifdef TEST_I2C1
     test_i2c();
 #endif
-
+    test_loop_led();
     //test_sleep_mode();
     //FILE* f = fopen("a","1");
     //printf("a");

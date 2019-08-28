@@ -1,5 +1,5 @@
 
-#define LED1 GPIO_FD_REVERSE(PORTC, 13)
+#define LED0 GPIO_FD_REVERSE(PORTC, 13)
 #define KEY1 GPIO_FD(PORTA, 0)
 
 #define SERIAL1 UART_FD(1)
@@ -7,14 +7,24 @@
 
 #define TEST_I2C1 I2C_FD(1)
 
-void HAL_Config(){
-    gpio_init(LED1, GPIO_MODE_OUTPUT_PP, GPIO_PULLUP);
+#define MOUNT_FD(filename, fd) if(strcmp(name, filename)==0)return fd
+
+
+int System_Open(const char* name, int flags){
+    MOUNT_FD("/leds/led0", LED0);
+    return -1;
+}
+
+void System_Config(){
+    gpio_init(LED0, GPIO_MODE_OUTPUT_PP, GPIO_PULLUP);
     gpio_init(KEY1, GPIO_MODE_IT_RISING, 0);
 
     uart_init(SERIAL1, UART1_DEFAULT_PINS, B9600|CS8);
     uart_init(SERIAL2, UART3_DEFAULT_PINS, B9600|CS8);
 
-    i2c_init(TEST_I2C1, I2C1_DEFAULT_PINS, 0x70, 0xA0);    
+    i2c_init(TEST_I2C1, I2C1_DEFAULT_PINS, 0x70, 0xA0); 
+
+    stdio_set_fd(SERIAL2,SERIAL2,SERIAL2);   
 }
 
 

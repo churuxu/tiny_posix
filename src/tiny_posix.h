@@ -17,8 +17,9 @@ http://pubs.opengroup.org/onlinepubs/9699919799/
 #include <fcntl.h>
 #endif
 
-//mingw headers
-#ifdef __GNUC__ 
+//headers
+#ifdef __GNUC__
+#include <fcntl.h> 
 #include <unistd.h> 
 #endif
 
@@ -223,7 +224,7 @@ ssize_t sendto(int fd, const void* buf, size_t buflen, int flags, const struct s
 
 //=========== file system ==============
 int stat(const char* filename, struct stat* out);
-int mkdir(const char* path, int mode);
+int mkdir(const char* path, mode_t mode);
 int rmdir(const char* path);
 int unlink(const char* filename);
 int utime(const char* filename, const struct utimbuf* out);

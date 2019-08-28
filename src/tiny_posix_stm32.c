@@ -1,6 +1,6 @@
 #include "tiny_posix.h"
 
-
+#include "system_config.h"
 
 #ifndef GPIO_SPEED_FREQ_HIGH
 #define GPIO_SPEED_FREQ_HIGH GPIO_SPEED_FAST
@@ -8,6 +8,7 @@
 
 #define UART_ATTR_GET 0
 #define UART_ATTR_SET 1
+
 
 static int stdio_fds_[3];
 
@@ -35,8 +36,6 @@ int stdio_write(int fd, const void* buf, int len){
     return -1;
 }
 
-extern void SystemClock_Config();
-extern void HAL_Config();
 
 static void default_clock_init(){
     __HAL_RCC_PWR_CLK_ENABLE();
@@ -75,7 +74,7 @@ void tiny_posix_init(){
 
     HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
 
-    HAL_Config();    
+    System_Config();    
 }
 
 
@@ -312,7 +311,7 @@ int uart_init(int fd, int tx, int rx, int flags){
 #endif
 #ifdef UART5 
         case 4: 
-            __HAL_RCC_USART5_CLK_ENABLE();
+            __HAL_RCC_UART5_CLK_ENABLE();
             HAL_NVIC_EnableIRQ(UART5_IRQn);
             HAL_NVIC_SetPriority(UART5_IRQn,0,0);
             break;
@@ -687,9 +686,23 @@ ssize_t _tp_write(int fd, const void* buf, size_t sz){
     return -1;
 }
 
+
+int _tp_open(const char* pathname, int flags, ...){
+    int fd = System_Open(pathname, flags);
+    if(fd>=0)return fd;
+    return -1;
+}
+
+int _tp_close(int fd){
+    return 0;
+}
+
+
 int _tp_fcntl(int fd, int cmd, ...){
     return 0;
 }
+
+
 
 
 unsigned int _tp_sleep(unsigned int seconds){
