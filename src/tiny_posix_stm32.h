@@ -12,28 +12,44 @@
 
 #endif
 
+#define _tp_open _open 
+#define _tp_close _close
+#define _tp_read _read
+#define _tp_write _write
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 //fd types
-#define FD_TYPE_GPIO 0x01
-#define FD_TYPE_UART 0x02
-#define FD_TYPE_SPI  0x03
-#define FD_TYPE_I2C  0x04
+#define FD_TYPE_STD  0x00000000 //stdio
+#define FD_TYPE_GPIO 0x01000000
+#define FD_TYPE_UART 0x02000000
+#define FD_TYPE_SPI  0x03000000
+#define FD_TYPE_I2C  0x04000000
+
+#define FD_GET_TYPE(fd) (fd>>24)
+
+typedef void (*irq_handler)();
+
+void tiny_posix_init();
+
+//修改stdout stdin stderr
+void stdio_set_fd(int in, int out, int err);
+
 
 //gpio port names
-#define PORTA 0x00000000
-#define PORTB 0x01000000
-#define PORTC 0x02000000
-#define PORTD 0x03000000
-#define PORTE 0x04000000
-#define PORTF 0x05000000
-#define PORTG 0x06000000
-#define PORTH 0x07000000
-#define PORTI 0x08000000
-#define PORTJ 0x09000000
-#define PORTK 0x0A000000
+#define PORTA 0x000000
+#define PORTB 0x010000
+#define PORTC 0x020000
+#define PORTD 0x030000
+#define PORTE 0x040000
+#define PORTF 0x050000
+#define PORTG 0x060000
+#define PORTH 0x070000
+#define PORTI 0x080000
+#define PORTJ 0x090000
+#define PORTK 0x0A0000
 
 //gpio pin names
 #define PIN0  0x0001
@@ -76,30 +92,30 @@ GPIO_PULLUP
 GPIO_PULLDOWN
 */
 
-typedef void (*irq_handler)();
-
-void tiny_posix_init();
 
 extern GPIO_TypeDef* gpio_ports_[];
 
 //按port和pin获取fd，示例 GPIO_FD(PORTC, 13)
-#define GPIO_FD(port, pin) (port|((1<<pin)<<8)|FD_TYPE_GPIO)
+#define GPIO_FD(port, pin) (port|(1<<pin)|FD_TYPE_GPIO)
+
+#define GPIO_FD_REVERSE_FLAG 0x100000
 
 //获取反向输出的fd 
-#define GPIO_FD_REVERSE(port, pin) (0x10000000|GPIO_FD(port, pin))
+#define GPIO_FD_REVERSE(port, pin) (GPIO_FD_REVERSE_FLAG|GPIO_FD(port, pin))
 
 //fd获取port 
-#define GPIO_FD_GET_PORT(fd) (gpio_ports_[(fd>>24)&0x0f])
+#define GPIO_FD_GET_PORT(fd) (gpio_ports_[(fd>>16)&0x0f])
 
 //fd获取pin
-#define GPIO_FD_GET_PIN(fd) ((fd>>8)&0xffff)
+#define GPIO_FD_GET_PIN(fd) (fd&0xffff)
 
 //是否反向输出  
-#define GPIO_FD_IS_REVERSE(fd) (fd&0x70000000)
+#define GPIO_FD_IS_REVERSE(fd) (fd&GPIO_FD_REVERSE_FLAG)
 
 //gpio初始化  mode=GPIO_MODE_INPUT\GPIO_MODE_OUTPUT_PP\...  pull=GPIO_NOPULL\GPIO_PULLUP\GPIO_PULLDOWN
 int gpio_init(int fd, int mode, int pull);
 int gpio_init_ex(int fd, int mode, int pull, int af);
+
 
 //设置中断函数
 void gpio_set_irq(int fd, irq_handler func);
@@ -117,7 +133,9 @@ int gpio_write(int fd, const void* buf, int len);
 //============================= uart =============================
 
 //uart fd   id 1~5
-#define UART_FD(id) ((id-1)<<8|FD_TYPE_UART)
+#define UART_FD(id) ((id-1)|FD_TYPE_UART)
+
+#define UART_FD_GET_INDEX(fd) (fd&0x0f)
 
 //uart 默认引脚 (TX RX)
 #define UART1_DEFAULT_PINS GPIO_FD(PORTA, 9),  GPIO_FD(PORTA, 10)
@@ -140,7 +158,9 @@ int uart_write(int fd, const void* buf, int len);
 //============================= spi =============================
 
 //spi fd   id 1~3
-#define SPI_FD(id) ((id-1)<<8|FD_TYPE_SPI)
+#define SPI_FD(id) ((id-1)|FD_TYPE_SPI)
+
+#define SPI_FD_GET_INDEX(fd) (fd&0x0f)
 
 //spi 默认引脚 (CLK MISO MOSI)
 #define SPI1_DEFAULT_PINS  GPIO_FD(PORTA, 5),  GPIO_FD(PORTA, 6),  GPIO_FD(PORTA, 7)
@@ -162,8 +182,9 @@ int spi_write(int fd, const void* buf, int len);
 //============================= i2c =============================
 
 //i2c fd   id 1~2
-#define I2C_FD(id) ((id-1)<<8|FD_TYPE_I2C)
+#define I2C_FD(id) ((id-1)|FD_TYPE_I2C)
 
+#define I2C_FD_GET_INDEX(fd) (fd&0x0f)
 
 //i2c 默认引脚 (SCL SDA)
 #define I2C1_DEFAULT_PINS  GPIO_FD(PORTB, 6),  GPIO_FD(PORTB, 7)

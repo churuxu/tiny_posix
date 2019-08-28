@@ -101,11 +101,11 @@ void on_key(){
     gpio_set(LED1);
 }
 
+
+
 int main(){
-    char buf[64];
-    int port1 = SERIAL1;
-    int port2 = SERIAL2;
-    int ret;
+    char buf[64];    
+    int ret ;
 
     tiny_posix_init(); 
 
@@ -119,15 +119,18 @@ int main(){
 #endif
 
     //test_sleep_mode();
-
+    //FILE* f = fopen("a","1");
+    //printf("a");
+    //fwrite("aaa",1,2,f);
+    //fclose(f);
     while(1){
         loop_leds();
-                
-        uart_write(port1, "hello", 5);        
-        
-        ret = uart_read(port2, buf, 64);
+
+        printf("hello world\n");
+
+        ret = read(STDIN_FILENO, buf, 64);
         if(ret>0){
-            uart_write(port2, buf, ret);
+            write(STDOUT_FILENO, buf, ret);
         }
     }
 

@@ -1,5 +1,3 @@
-
-#include "tiny_posix_stm32.h"
 #include "tiny_posix.h"
 
 #ifndef GPIO_SPEED_FREQ_HIGH
@@ -9,32 +7,31 @@
 #define UART_ATTR_GET 0
 #define UART_ATTR_SET 1
 
-//=============== 全局对象 =================
+static int stdio_fds_[3];
 
-GPIO_TypeDef* gpio_ports_[] = {
-    GPIOA,
-    GPIOB,
-#ifdef GPIOC    
-    GPIOC,
-#endif    
-#ifdef GPIOD
-    GPIOD,
-#endif
-#ifdef GPIOE
-    GPIOE,
-#endif
-#ifdef GPIOF
-    GPIOF,
-#endif
-#ifdef GPIOG
-    GPIOG,
-#endif
-};
+void stdio_set_fd(int in, int out, int err){
+    stdio_fds_[0] = in;
+    stdio_fds_[1] = out;
+    stdio_fds_[2] = err;
+}
 
-//gpio中断回调函数
-static irq_handler gpio_irqs_[16];
-
-
+//stdio 输入
+int stdio_read(int fd, void* buf, int len){
+    if(fd == STDIN_FILENO && stdio_fds_[0]){
+        return _tp_read(stdio_fds_[0], buf, len);
+    }
+    return -1;
+}
+//stdio 输出
+int stdio_write(int fd, const void* buf, int len){
+    if(fd == STDOUT_FILENO && stdio_fds_[1]){
+        return _tp_write(stdio_fds_[1], buf, len);
+    }
+    if(fd == STDERR_FILENO && stdio_fds_[2]){
+        return _tp_write(stdio_fds_[2], buf, len);
+    }    
+    return -1;
+}
 
 extern void SystemClock_Config();
 extern void HAL_Config();
@@ -74,6 +71,39 @@ void tiny_posix_init(){
 
     HAL_Config();    
 }
+
+
+//=============== gpio =================
+
+GPIO_TypeDef* gpio_ports_[] = {
+    GPIOA,
+    GPIOB,
+#ifdef GPIOC    
+    GPIOC,
+#endif    
+#ifdef GPIOD
+    GPIOD,
+#endif
+#ifdef GPIOE
+    GPIOE,
+#endif
+#ifdef GPIOF
+    GPIOF,
+#endif
+#ifdef GPIOG
+    GPIOG,
+#endif
+#ifdef GPIOH
+    GPIOH,
+#endif
+#ifdef GPIOI
+    GPIOI,
+#endif
+};
+
+//gpio中断回调函数
+static irq_handler gpio_irqs_[16];
+
 
 int gpio_init_ex(int fd, int mode, int pull, int af){
     GPIO_InitTypeDef GPIO_InitStruct;
@@ -169,7 +199,7 @@ UART_HandleTypeDef uart_handles_[sizeof(uarts_)/sizeof(void*)];
 
 
 static UART_HandleTypeDef* uart_get_handle(int fd){
-    int index = (fd>>8);    
+    int index = UART_FD_GET_INDEX(fd);    
     return &(uart_handles_[index]);
 }
 
@@ -219,7 +249,7 @@ int uart_set_flags(int fd, int flags){
     int stopbits;
     int parity;
     int wordlen;
-    int index = (fd>>8);
+    int index = UART_FD_GET_INDEX(fd);
     UART_HandleTypeDef* uart = uart_get_handle(fd);   
     if(!uart)return -1;
 
@@ -246,7 +276,7 @@ int uart_set_flags(int fd, int flags){
 
 
 int uart_init(int fd, int tx, int rx, int flags){    
-    int index = (fd>>8);
+    int index = UART_FD_GET_INDEX(fd);;
     int af = uart_get_gpio_af(index);
 
     switch(index){
@@ -368,7 +398,7 @@ SPI_TypeDef* spis_[] = {
 SPI_HandleTypeDef spi_handles_[sizeof(spis_)/sizeof(void*)];
 
 static SPI_HandleTypeDef* spi_get_handle(int fd){
-    int index = (fd>>8);    
+    int index = SPI_FD_GET_INDEX(fd);   
     return &(spi_handles_[index]);
 }
 
@@ -387,7 +417,7 @@ static int spi_get_gpio_af(int index){
 }
 
 static int spi_set_flags(int fd, int flags){
-    int index = (fd>>8);
+    int index = SPI_FD_GET_INDEX(fd);
     SPI_HandleTypeDef* spi = spi_get_handle(fd); 
 
     spi->Instance = spis_[index];
@@ -410,7 +440,7 @@ static int spi_set_flags(int fd, int flags){
 }
 
 int spi_init(int fd, int clkpin, int misopin, int mosipin){
-    int index = (fd>>8);
+    int index = SPI_FD_GET_INDEX(fd);
     int af = spi_get_gpio_af(index); 
 
     //clk enable
@@ -484,7 +514,7 @@ static uint16_t i2c_peers_[sizeof(i2cs_)/sizeof(void*)];
 static uint16_t i2c_memaddr_[sizeof(i2cs_)/sizeof(void*)];
 
 static I2C_HandleTypeDef* i2c_get_handle(int fd){
-    int index = (fd>>8);    
+    int index = I2C_FD_GET_INDEX(fd);    
     return &(i2c_handles_[index]);
 }
 
@@ -500,19 +530,19 @@ static int i2c_get_gpio_af(int index){
 }
 
 int i2c_set_peer(int fd, int addr){
-    int index = (fd>>8);
+    int index = I2C_FD_GET_INDEX(fd);   
     i2c_peers_[index] = (uint16_t)addr;
     return 0;
 }
 
 int i2c_set_offset(int fd, int off){
-    int index = (fd>>8);
+    int index = I2C_FD_GET_INDEX(fd);   
     i2c_memaddr_[index] = (uint16_t)off;
     return 0;
 }
 
 int i2c_set_local(int fd, int addr){
-    int index = (fd>>8);
+    int index = I2C_FD_GET_INDEX(fd);   
     I2C_HandleTypeDef* i2c = i2c_get_handle(fd); 
 
     i2c->Instance             = i2cs_[index];  
@@ -534,7 +564,7 @@ int i2c_set_local(int fd, int addr){
 
 //初始化i2c（主机）
 int i2c_init(int fd, int sclpin, int sdapin, int flags, int peeraddr){
-    int index = (fd>>8);
+    int index = I2C_FD_GET_INDEX(fd);   
     int af = i2c_get_gpio_af(index); 
 
     //clk enable
@@ -555,7 +585,7 @@ int i2c_init(int fd, int sclpin, int sdapin, int flags, int peeraddr){
 
 int i2c_test(int fd){
     uint16_t peer;
-    int index = (fd>>8);    
+    int index = I2C_FD_GET_INDEX(fd);   
     int timeout = 1000;
     I2C_HandleTypeDef* i2c = i2c_get_handle(fd); 
     if(!i2c)return -1;
@@ -571,7 +601,7 @@ int i2c_read(int fd, void* buf, int len){
     uint16_t peer;
     uint16_t mem;
     uint16_t memsz = 1;
-    int index = (fd>>8);
+    int index = I2C_FD_GET_INDEX(fd);   
     int recved = 0;
     int timeout ;
     I2C_HandleTypeDef* i2c = i2c_get_handle(fd); 
@@ -598,7 +628,7 @@ int i2c_write(int fd, const void* buf, int len){
     uint16_t mem;
     uint16_t memsz = 1;    
     int timeout ;
-    int index = (fd>>8);
+    int index = I2C_FD_GET_INDEX(fd);   
     I2C_HandleTypeDef* i2c = i2c_get_handle(fd); 
     if(!i2c)return -1; 
     timeout = 5000;
@@ -619,8 +649,43 @@ int i2c_write(int fd, const void* buf, int len){
 
 
 
+//======================== posix api =============================
+typedef int (*read_func)(int fd, void* buf, int sz);
+typedef int (*write_func)(int fd, const void* buf, int sz);
+typedef int (*fcntl_func)(int fd, const void* buf, va_list v);
 
-//======================== SYS =============================
+typedef struct file_ops{
+    read_func rd;
+    write_func wr;
+    fcntl_func ctl;
+}file_ops;
+
+static file_ops file_ops_[] = {
+    {stdio_read, stdio_write, NULL},
+    {gpio_read,  gpio_write, NULL},
+    {uart_read,  uart_write, NULL}, 
+};
+
+
+ssize_t _tp_read(int fd, void* buf, size_t sz){
+    int type = FD_GET_TYPE(fd);
+    read_func func = file_ops_[type].rd;
+    if(func)return func(fd, buf, sz);
+    return -1;
+}
+
+ssize_t _tp_write(int fd, const void* buf, size_t sz){
+    int type = FD_GET_TYPE(fd);
+    write_func func = file_ops_[type].wr;
+    if(func)return func(fd, buf, sz);
+    return -1;
+}
+
+int _tp_fcntl(int fd, int cmd, ...){
+    return 0;
+}
+
+
 unsigned int _tp_sleep(unsigned int seconds){
     HAL_Delay(seconds * 1000);
     return 0;
@@ -635,7 +700,7 @@ _tp_clock_t _tp_clock(){
 }
 
 
-
+// 
 
 
 
