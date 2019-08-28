@@ -1,7 +1,6 @@
 #include "tiny_posix.h"
 #include "hal_config.h"
 
-
 static int leds_[] = {
     LED1,
 #ifdef LED2
@@ -106,8 +105,7 @@ void on_key(){
 int main(){
     char buf[64];    
     int ret ;
-
-    tiny_posix_init(); 
+   
 
     gpio_set_irq(KEY1, on_key);
     

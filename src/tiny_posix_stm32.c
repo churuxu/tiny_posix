@@ -1,5 +1,7 @@
 #include "tiny_posix.h"
 
+
+
 #ifndef GPIO_SPEED_FREQ_HIGH
 #define GPIO_SPEED_FREQ_HIGH GPIO_SPEED_FAST
 #endif
@@ -56,6 +58,10 @@ static void default_clock_init(){
 }
 
 
+
+#ifdef __GNUC__
+__attribute__((constructor))
+#endif
 void tiny_posix_init(){    
     HAL_Init();
 
