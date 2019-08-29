@@ -19,6 +19,83 @@ void loop_leds(){
     }
 }
 
+#ifdef GPIO_AF12_FSMC
+static SRAM_HandleTypeDef hsram1;
+
+#define  CMD_BASE     ((uint32_t)(0x6C000000 | 0x00001FFE))
+#define  DATA_BASE    ((uint32_t)(0x6C000000 | 0x00002000))
+
+#define LCD_CMD       ( * (uint16_t *) CMD_BASE )
+#define LCD_DATA      ( * (uint16_t *) DATA_BASE)
+
+void test_fsmc(){
+    int fds1 = GPIO_MULTI_FD(PORTD, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_8|GPIO_PIN_9|GPIO_PIN_10|GPIO_PIN_14|GPIO_PIN_15);
+    int fds2 = GPIO_MULTI_FD(PORTE, GPIO_PIN_7|GPIO_PIN_8|GPIO_PIN_9|GPIO_PIN_10|GPIO_PIN_11|GPIO_PIN_12|GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_15);
+
+
+    __HAL_RCC_FSMC_CLK_ENABLE();
+
+    gpio_init(GPIO_FD(PORTF, 10), GPIO_MODE_OUTPUT_PP, GPIO_PULLUP);
+
+    gpio_init_ex(fds1, GPIO_MODE_AF_PP, GPIO_PULLUP, GPIO_AF12_FSMC);
+    gpio_init_ex(fds2, GPIO_MODE_AF_PP, GPIO_PULLUP, GPIO_AF12_FSMC);
+
+    gpio_init_ex(GPIO_FD(PORTG, 2), GPIO_MODE_AF_PP, GPIO_PULLUP, GPIO_AF12_FSMC);
+    gpio_init_ex(GPIO_FD(PORTG, 12), GPIO_MODE_AF_PP, GPIO_PULLUP, GPIO_AF12_FSMC);
+
+  FSMC_NORSRAM_TimingTypeDef Timing;
+
+  /** Perform the SRAM1 memory initialization sequence
+  */
+  hsram1.Instance = FSMC_NORSRAM_DEVICE;
+  hsram1.Extended = FSMC_NORSRAM_EXTENDED_DEVICE;
+  /* hsram1.Init */
+  hsram1.Init.NSBank = FSMC_NORSRAM_BANK4;
+  hsram1.Init.DataAddressMux = FSMC_DATA_ADDRESS_MUX_DISABLE;
+  hsram1.Init.MemoryType = FSMC_MEMORY_TYPE_SRAM;
+  hsram1.Init.MemoryDataWidth = FSMC_NORSRAM_MEM_BUS_WIDTH_16;
+  hsram1.Init.BurstAccessMode = FSMC_BURST_ACCESS_MODE_DISABLE;
+  hsram1.Init.WaitSignalPolarity = FSMC_WAIT_SIGNAL_POLARITY_LOW;
+  hsram1.Init.WrapMode = FSMC_WRAP_MODE_DISABLE;
+  hsram1.Init.WaitSignalActive = FSMC_WAIT_TIMING_BEFORE_WS;
+  hsram1.Init.WriteOperation = FSMC_WRITE_OPERATION_ENABLE;
+  hsram1.Init.WaitSignal = FSMC_WAIT_SIGNAL_DISABLE;
+  hsram1.Init.ExtendedMode = FSMC_EXTENDED_MODE_DISABLE;
+  hsram1.Init.AsynchronousWait = FSMC_ASYNCHRONOUS_WAIT_DISABLE;
+  hsram1.Init.WriteBurst = FSMC_WRITE_BURST_DISABLE;
+  //hsram1.Init.PageSize = 0;
+  /* Timing */
+  Timing.AddressSetupTime = 5;
+  Timing.AddressHoldTime = 15;
+  Timing.DataSetupTime = 8;
+  Timing.BusTurnAroundDuration = 1;
+  Timing.CLKDivision = 16;
+  Timing.DataLatency = 17;
+  Timing.AccessMode = FSMC_ACCESS_MODE_A;
+  /* ExtTiming */
+
+  if (HAL_SRAM_Init(&hsram1, &Timing, NULL) != HAL_OK)
+  {
+    //_Error_Handler(__FILE__, __LINE__);
+  }
+
+    sleep(1);
+ 	 uint16_t id;
+	
+	 LCD_CMD=0xD3;	//9341读ID命令   
+	 id=LCD_DATA;	 
+	 id=LCD_DATA; 	//0x00
+	 id=LCD_DATA;   //0x93								   
+	 id<<=8;
+	 id|=LCD_DATA;  //0x41  
+
+    
+    printf("aaa %04x", (int)id);
+    
+}
+
+#endif
+
 
 #ifdef TEST_SPI1
 void test_spi(){
@@ -116,7 +193,9 @@ int main(){
     char buf[64];    
     int ret;
    
-
+#ifdef GPIO_AF12_FSMC
+    test_fsmc();
+#endif
     //gpio_set_irq(KEY1, on_key);
     
 #ifdef TEST_SPI1

@@ -86,6 +86,9 @@ extern GPIO_TypeDef* gpio_ports_[];
 //按port和pin获取fd，示例 GPIO_FD(PORTC, 13)
 #define GPIO_FD(port, pin) (port|(1<<pin)|FD_TYPE_GPIO)
 
+//示例 GPIO_MULTI_FD(PORTC, GPIO_PIN_1|GPIO_PIN_2)
+#define GPIO_MULTI_FD(port, pins) (port|pins|FD_TYPE_GPIO)
+
 #define GPIO_FD_REVERSE_FLAG 0x100000
 
 //获取反向输出的fd 
