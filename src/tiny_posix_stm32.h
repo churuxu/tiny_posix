@@ -22,11 +22,13 @@ extern "C" {
 #endif
 
 //fd types
-#define FD_TYPE_STD  0x00000000 //stdio
-#define FD_TYPE_GPIO 0x01000000
-#define FD_TYPE_UART 0x02000000
-#define FD_TYPE_SPI  0x03000000
-#define FD_TYPE_I2C  0x04000000
+#define FD_TYPE_STD   0x00000000 //stdio
+#define FD_TYPE_GPIO  0x01000000
+#define FD_TYPE_UART  0x02000000
+#define FD_TYPE_SPI   0x03000000
+#define FD_TYPE_I2C   0x04000000
+//#define FD_TYPE_FLASH 0x05000000 //内部flash
+
 
 #define FD_GET_TYPE(fd) (fd>>24)
 
@@ -51,23 +53,6 @@ void stdio_set_fd(int in, int out, int err);
 #define PORTJ 0x090000
 #define PORTK 0x0A0000
 
-//gpio pin names
-#define PIN0  0x0001
-#define PIN1  0x0002
-#define PIN2  0x0004
-#define PIN3  0x0008
-#define PIN4  0x0010
-#define PIN5  0x0020 
-#define PIN6  0x0040
-#define PIN7  0x0080
-#define PIN8  0x0100 
-#define PIN9  0x0200
-#define PIN10 0x0400 
-#define PIN11 0x0800 
-#define PIN12 0x1000 
-#define PIN13 0x2000 
-#define PIN14 0x4000
-#define PIN15 0x8000
 
 //gpio modes
 //#define  GPIO_MODE_INPUT                        0x00000000U   /*!< Input Floating Mode                   */
@@ -207,6 +192,10 @@ int i2c_test(int fd);
 //read/write 函数
 int i2c_read(int fd, void* buf, int len);
 int i2c_write(int fd, const void* buf, int len);
+
+
+
+
 
 #ifdef __cplusplus
 }

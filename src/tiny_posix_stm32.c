@@ -38,7 +38,9 @@ int stdio_write(int fd, const void* buf, int len){
 
 
 static void default_clock_init(){
-    __HAL_RCC_PWR_CLK_ENABLE();
+    //__HAL_RCC_PWR_CLK_ENABLE();
+    //__HAL_RCC_AFIO_CLK_ENABLE();
+
     __HAL_RCC_GPIOA_CLK_ENABLE();
     __HAL_RCC_GPIOB_CLK_ENABLE();   
     __HAL_RCC_GPIOC_CLK_ENABLE();
@@ -63,10 +65,10 @@ __attribute__((constructor))
 #endif
 void tiny_posix_init(){    
     HAL_Init();
+      
+    SystemClock_Config();
 
     default_clock_init();
-    
-    SystemClock_Config();
 
     HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq()/1000);
 
@@ -184,7 +186,7 @@ int gpio_write(int fd, const void* buf, int len){
 
 //======================== uart ========================
 
-USART_TypeDef* uarts_[] = {
+static USART_TypeDef* uarts_[] = {
     USART1,
     USART2,
 #ifdef USART3   
@@ -389,7 +391,7 @@ int _tp_tcsetattr(int fd, int opt, const struct termios* attr){
 
 //======================== spi ========================
 
-SPI_TypeDef* spis_[] = {
+static SPI_TypeDef* spis_[] = {
     SPI1,
 #ifdef SPI2
     SPI2,

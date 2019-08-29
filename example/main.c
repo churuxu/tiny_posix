@@ -120,10 +120,10 @@ int main(){
     //gpio_set_irq(KEY1, on_key);
     
 #ifdef TEST_SPI1
-    test_spi();
+    //test_spi();
 #endif
 #ifdef TEST_I2C1
-    test_i2c();
+    //test_i2c();
 #endif
     test_loop_led();
     //test_sleep_mode();
@@ -132,7 +132,7 @@ int main(){
     //fwrite("aaa",1,2,f);
     //fclose(f);
     while(1){
-        loop_leds();
+        //loop_leds();
 
         printf("hello world\n");
 
