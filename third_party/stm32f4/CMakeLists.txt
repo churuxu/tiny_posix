@@ -58,13 +58,13 @@ xpackage_init(${PACKAGE_NAME} ${PACKAGE_VERSION} ${PACKAGE_URL} "${FLAGS}" SRC_R
 set(HAL_DRIVER_DIR ${SRC_ROOT}/${SRC_DIR}/Drivers/STM32F4xx_HAL_Driver)
 set(CMSIS_DIR ${SRC_ROOT}/${SRC_DIR}/Drivers/CMSIS)
 set(CMSIS_ST_DIR ${SRC_ROOT}/${SRC_DIR}/Drivers/CMSIS/Device/ST/STM32F4xx)
-
+set(BSP_INC ${SRC_ROOT}/${SRC_DIR}/Drivers/BSP/Components/Common) 
 
 if(NOT EXISTS ${HAL_DRIVER_DIR}/Inc/stm32f4xx_hal_conf.h)
 	configure_file(${HAL_DRIVER_DIR}/Inc/stm32f4xx_hal_conf_template.h ${HAL_DRIVER_DIR}/Inc/stm32f4xx_hal_conf.h COPYONLY)
 endif()
 
-set(EXPORT_INCS ${HAL_DRIVER_DIR}/Inc ${CMSIS_ST_DIR}/Include ${CMSIS_DIR}/Include)
+set(EXPORT_INCS ${HAL_DRIVER_DIR}/Inc ${CMSIS_ST_DIR}/Include ${CMSIS_DIR}/Include ${BSP_INC})
 
 include_directories(${EXPORT_INCS})
 

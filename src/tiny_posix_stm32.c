@@ -652,7 +652,39 @@ int i2c_write(int fd, const void* buf, int len){
 }
 
 
+//===================== lcd ===================
+#define MAX_LCD_COUNT 1
 
+static LCD_DrvTypeDef* lcd_drvs_[MAX_LCD_COUNT];
+static uint16_t lcd_ids_[MAX_LCD_COUNT];
+static uint8_t lcd_state_[MAX_LCD_COUNT];
+
+int lcd_init(int fd, LCD_DrvTypeDef* driver, uint16_t lcdid){
+    uint16_t readedid;
+    int index = LCD_FD_GET_INDEX(fd);
+    if(index >= MAX_LCD_COUNT)return -1;
+    lcd_drvs_[index] = driver;
+    lcd_ids_[index] = lcdid;
+
+    driver->Init();
+    readedid = driver->ReadID();
+    if(lcdid && lcdid != readedid){
+        return -1;
+    }
+    driver->DisplayOn();
+    lcd_state_[index] = 1;
+    return 0;
+}
+
+//turn on/off
+int lcd_display(int fd, int on){
+    return 0;
+}
+
+int lcd_get_width(int fd);
+int lcd_get_height(int fd);
+
+int lcd_draw(int fd, int x, int y, int w, int h, void* rgbdata);
 
 
 

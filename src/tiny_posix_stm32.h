@@ -12,6 +12,8 @@
 
 #endif
 
+#include "lcd.h"
+
 #define _tp_open _open 
 #define _tp_close _close
 #define _tp_read _read
@@ -27,6 +29,7 @@ extern "C" {
 #define FD_TYPE_UART  0x02000000
 #define FD_TYPE_SPI   0x03000000
 #define FD_TYPE_I2C   0x04000000
+#define FD_TYPE_LCD   0x05000000
 //#define FD_TYPE_FLASH 0x05000000 //内部flash
 
 
@@ -195,7 +198,21 @@ int i2c_write(int fd, const void* buf, int len);
 
 
 
+//===================== lcd ===================
+//id=1~2
+#define LCD_FD(id) ((id-1)|FD_TYPE_LCD)
+#define LCD_FD_GET_INDEX(fd) (fd&0x0f)
 
+
+int lcd_init(int fd, LCD_DrvTypeDef* driver, uint16_t lcdid);
+
+//turn on/off
+int lcd_display(int fd, int on);
+
+int lcd_get_width(int fd);
+int lcd_get_height(int fd);
+
+int lcd_draw(int fd, int x, int y, int w, int h, void* rgbdata);
 
 #ifdef __cplusplus
 }

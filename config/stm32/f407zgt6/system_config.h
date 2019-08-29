@@ -17,6 +17,8 @@ int System_Open(const char* name, int flags){
     return -1;
 }
 
+extern LCD_DrvTypeDef* lcd_drv;
+
 void System_Config(){
     gpio_init(LED0, GPIO_MODE_OUTPUT_PP, GPIO_PULLUP);
     gpio_init(LED1, GPIO_MODE_OUTPUT_PP, GPIO_PULLUP);
@@ -28,6 +30,8 @@ void System_Config(){
     uart_init(SERIAL2, UART5_DEFAULT_PINS, B9600|CS8);
 
     stdio_set_fd(SERIAL2,SERIAL2,SERIAL2);
+
+    //lcd_init(LCD_FD(1), lcd_drv, 0);
 }
 
 
