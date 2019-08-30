@@ -12,7 +12,6 @@
 
 #endif
 
-#include "lcd.h"
 
 #define _tp_open _open 
 #define _tp_close _close
@@ -29,7 +28,8 @@ extern "C" {
 #define FD_TYPE_UART  0x02000000
 #define FD_TYPE_SPI   0x03000000
 #define FD_TYPE_I2C   0x04000000
-#define FD_TYPE_LCD   0x05000000
+#define FD_TYPE_DISK  0x05000000
+#define FD_TYPE_LCD   0x06000000
 //#define FD_TYPE_FLASH 0x05000000 //内部flash
 
 
@@ -203,9 +203,30 @@ int i2c_write(int fd, const void* buf, int len);
 
 //===================== lcd ===================
 //id=1~2
-#define LCD_FD(id) ((id-1)|FD_TYPE_LCD)
+#define LCD_FD(index) ((index)|FD_TYPE_LCD)
 #define LCD_FD_GET_INDEX(fd) (fd&0x0f)
 
+
+typedef struct
+{
+  void     (*Init)(void);
+  uint16_t (*ReadID)(void);
+  void     (*DisplayOn)(void);
+  void     (*DisplayOff)(void);
+  void     (*SetCursor)(uint16_t, uint16_t);
+  void     (*WritePixel)(uint16_t, uint16_t, uint16_t);
+  uint16_t (*ReadPixel)(uint16_t, uint16_t);
+  
+   /* Optimized operation */
+  void     (*SetDisplayWindow)(uint16_t, uint16_t, uint16_t, uint16_t);
+  void     (*DrawHLine)(uint16_t, uint16_t, uint16_t, uint16_t);
+  void     (*DrawVLine)(uint16_t, uint16_t, uint16_t, uint16_t);
+  
+  uint16_t (*GetLcdPixelWidth)(void);
+  uint16_t (*GetLcdPixelHeight)(void);
+  void     (*DrawBitmap)(uint16_t, uint16_t, uint8_t*);
+  void     (*DrawRGBImage)(uint16_t, uint16_t, uint16_t, uint16_t, uint8_t*);
+}LCD_DrvTypeDef; 
 
 int lcd_init(int fd, LCD_DrvTypeDef* driver, uint16_t lcdid);
 
@@ -215,7 +236,50 @@ int lcd_display(int fd, int on);
 int lcd_get_width(int fd);
 int lcd_get_height(int fd);
 
+int lcd_fill(int fd, int x, int y, int w, int h, uint32_t color);
 int lcd_draw(int fd, int x, int y, int w, int h, void* rgbdata);
+
+
+//===================== raw diskio ===================
+typedef enum {
+	RES_OK = 0,		/* 0: Successful */
+	RES_ERROR,		/* 1: R/W Error */
+	RES_WRPRT,		/* 2: Write Protected */
+	RES_NOTRDY,		/* 3: Not Ready */
+	RES_PARERR		/* 4: Invalid Parameter */
+} DRESULT;
+
+#define STA_NOINIT		0x01	/* Drive not initialized */
+#define STA_NODISK		0x02	/* No medium in the drive */
+#define STA_PROTECT		0x04	/* Write protected */
+
+#define CTRL_SYNC 0
+#define GET_SECTOR_COUNT	1	/* Get media size (needed at _USE_MKFS == 1) */
+#define GET_SECTOR_SIZE		2	/* Get sector size (needed at _MAX_SS != _MIN_SS) */
+#define GET_BLOCK_SIZE		3	/* Get erase block size (needed at _USE_MKFS == 1) */
+
+typedef struct{
+  int (*disk_initialize) (uint8_t id);                     /*!< Initialize Disk Drive                     */
+  int (*disk_status)     (uint8_t id);                     /*!< Get Disk Status                           */
+  DRESULT (*disk_read)       (uint8_t id, uint8_t* buf, unsigned int sector, unsigned int count);       /*!< Read Sector(s)                            */
+  DRESULT (*disk_write)      (uint8_t id, const uint8_t* buf, unsigned int sector, unsigned int count); /*!< Write Sector(s) when _USE_WRITE = 0       */
+  DRESULT (*disk_ioctl)      (uint8_t id, uint8_t cmd, void* buf);              /*!< I/O control operation when _USE_IOCTL = 1 */
+}Diskio_drvTypeDef;
+
+//id 1~16  
+#define DISK_FD(index) ((index)|FD_TYPE_DISK)
+#define DISK_FD_GET_INDEX(fd) (fd&0x0f)
+
+//初始化一个外部存储为disk
+int disk_init(int fd, Diskio_drvTypeDef* driver);
+
+//初始化内部flash为disk
+int disk_init_rom(int fd);
+
+int disk_lseek(int fd, int offset, int how);
+int disk_read(int fd, void* buf, int len);
+int disk_write(int fd, const void* buf, int len);
+
 
 #ifdef __cplusplus
 }

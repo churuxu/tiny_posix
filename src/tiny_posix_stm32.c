@@ -38,8 +38,8 @@ int stdio_write(int fd, const void* buf, int len){
 
 
 static void default_clock_init(){
-    //__HAL_RCC_PWR_CLK_ENABLE();
-    //__HAL_RCC_AFIO_CLK_ENABLE();
+    __HAL_RCC_PWR_CLK_ENABLE();
+    __HAL_RCC_AFIO_CLK_ENABLE();
 
     __HAL_RCC_GPIOA_CLK_ENABLE();
     __HAL_RCC_GPIOB_CLK_ENABLE();   
@@ -122,7 +122,7 @@ int gpio_init_ex(int fd, int mode, int pull, int af){
     GPIO_InitStruct.Alternate = af;
 #endif
     HAL_GPIO_Init(GPIO_FD_GET_PORT(fd), &GPIO_InitStruct);   
-    //gpio_reset(fd);
+    gpio_reset(fd);
     return 0;    
 }
 
@@ -686,6 +686,325 @@ int lcd_get_height(int fd);
 
 int lcd_draw(int fd, int x, int y, int w, int h, void* rgbdata);
 
+
+
+
+//======================= raw disk =============================
+
+typedef struct disk_info{    
+    unsigned int total_size;
+    unsigned int block_count;
+    unsigned int block_size;
+    unsigned int sector_count;
+    unsigned int sector_size;
+    unsigned int rw_pos;
+    uint16_t fact; //block_size = fact * sector_size
+    uint8_t inited;
+    uint8_t rev;
+}disk_info;
+
+#ifndef DISK_BUFSIZE
+#define DISK_BUFSIZE 4096
+#endif
+
+#define MAX_DISK_COUNT 4
+
+static Diskio_drvTypeDef* disk_drvs_[MAX_DISK_COUNT];
+static disk_info disk_info_[MAX_DISK_COUNT];
+
+
+//rom disk 读写内部flash
+static int rom_disk_initialize(uint8_t id) {return 0;}
+static int rom_disk_status(uint8_t id) {return 0;}
+
+static DRESULT rom_disk_read(uint8_t id, uint8_t* buf, unsigned int sector, unsigned int count){
+    void* addr = (void*)(uintptr_t)(sector * 1);
+    memcpy(buf, addr, count);
+    return 0;
+}
+static DRESULT rom_disk_write(uint8_t id, const uint8_t* buf, unsigned int sector, unsigned int count){
+    FLASH_EraseInitTypeDef pEraseInit;
+    uint32_t error = 0;
+    uint32_t addr = (uintptr_t)(sector * 1);
+    uint64_t* ptr = (uint64_t*)buf;
+    size_t remainlen = count;
+    HAL_StatusTypeDef state;    
+    DRESULT ret = RES_ERROR;
+    if(count % FLASH_PAGE_SIZE){
+        errno = EINVAL;
+        return RES_ERROR;        
+    } 
+
+    HAL_FLASH_Unlock();
+
+    pEraseInit.PageAddress = addr;
+    pEraseInit.NbPages = count / FLASH_PAGE_SIZE;
+    pEraseInit.TypeErase = FLASH_TYPEERASE_PAGES;
+    state = HAL_FLASHEx_Erase(&pEraseInit, &error);
+    if(state != HAL_OK){        
+        errno = EFAULT;
+        goto finish;
+    }
+
+    while(remainlen>0){
+        state = HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, addr, *ptr);
+        if (state != HAL_OK){
+            errno = EIO;
+            goto finish;
+        }     
+        ptr += 1;
+        addr += 8;
+        remainlen -= 8;
+    }
+
+    ret = 0;
+finish:
+    HAL_FLASH_Lock();
+    return ret;    
+}
+static DRESULT rom_disk_ioctl(uint8_t id, uint8_t cmd, void* buf){
+    unsigned int* pval = (unsigned int*)buf;
+    uint16_t kb;
+    if(cmd == CTRL_SYNC){
+        return RES_OK;
+    }    
+    if(cmd == GET_SECTOR_COUNT){
+        kb = *((uint16_t*)(uintptr_t)(FLASH_SIZE_DATA_REGISTER));
+        *pval = kb * 1024;
+        return RES_OK;
+    }
+    if(cmd == GET_SECTOR_SIZE){
+        *pval = 1;
+        return RES_OK;
+    }
+    if(cmd == GET_BLOCK_SIZE){
+        *pval = FLASH_PAGE_SIZE;
+        return RES_OK;
+    }
+    return RES_PARERR;
+}
+
+static Diskio_drvTypeDef Diskio_drv_rom_ = {
+    rom_disk_initialize,
+    rom_disk_status,
+    rom_disk_read,
+    rom_disk_write,
+    rom_disk_ioctl,
+};
+
+int disk_init_rom(int fd){
+    return disk_init(fd, &Diskio_drv_rom_);
+}
+
+int disk_init(int fd, Diskio_drvTypeDef* driver){    
+    int index = DISK_FD_GET_INDEX(fd);    
+    if(index >= MAX_DISK_COUNT)return -1; 
+    disk_drvs_[index] = driver;
+    if(driver->disk_initialize(index)){
+        return -1;
+    }
+    if(driver->disk_ioctl(index, GET_SECTOR_COUNT, &disk_info_[index].sector_count)){
+        return -1;
+    }
+    if(driver->disk_ioctl(index, GET_SECTOR_SIZE, &disk_info_[index].sector_size)){
+        return -1;
+    }
+    if(driver->disk_ioctl(index, GET_BLOCK_SIZE, &disk_info_[index].block_size)){
+        return -1;
+    }  
+    if(disk_info_[index].block_size > DISK_BUFSIZE){
+        return -1;  
+    }
+    disk_info_[index].fact = disk_info_[index].block_size / disk_info_[index].sector_size;
+    if(!disk_info_[index].fact){
+        return -1;  
+    }
+    disk_info_[index].inited = 1;
+    disk_info_[index].total_size = disk_info_[index].sector_size * disk_info_[index].sector_count;
+    disk_info_[index].block_count = disk_info_[index].total_size / disk_info_[index].block_size;
+    
+    return 0;  
+}
+
+int disk_lseek(int fd, int offset, int how){
+    int pos;
+    int index = DISK_FD_GET_INDEX(fd);
+    if(index >= MAX_DISK_COUNT)return -1; 
+    if(!disk_info_[index].inited)return -1;
+    if(how == SEEK_END){
+        pos = disk_info_[index].total_size;
+    }else if(how == SEEK_CUR){
+        pos = disk_info_[index].rw_pos + offset;
+    }else{
+        pos = offset;
+    }
+    if(pos<0||pos>disk_info_[index].total_size)goto error;
+    if(offset % disk_info_[index].block_size)goto error;
+    disk_info_[index].rw_pos = pos;
+    return pos;
+error: 
+    disk_info_[index].rw_pos = disk_info_[index].total_size;
+    return -1;
+}
+
+
+typedef struct disk_io_param{
+    unsigned int sector_count; //要读写的块个数
+    unsigned int sector_index; //要读写的块索引  
+    unsigned int offset; //读到buffer 不是从0开始
+    unsigned int io_len; //读到buffer 不是全部    
+    unsigned int remain_len; //剩余长度
+    int need_buffer; //是否需要buffer
+}disk_io_param;
+
+//计算读写扇区位置
+static void disk_calc_io_param(unsigned int secsize, unsigned int secount, unsigned int pos, unsigned int len, disk_io_param* param){
+    unsigned int m, n, lm, ln, total; 
+    total = secsize * secount;
+    if((pos + len) > total){
+        len = total - pos;
+    }
+    if(secsize == 1){ //块大小=1，随便读写
+        param->sector_count = len;
+        param->sector_index = pos;
+        param->offset = 0;
+        param->io_len = len; 
+        param->remain_len = 0;
+        param->need_buffer = 0; 
+        return;        
+    }
+    m = pos % secsize;
+    n = pos / secsize;
+    if(m){ //非基准点
+        param->need_buffer = 1;
+        param->sector_count = 1;
+        param->sector_index = n;
+        param->offset = m;
+        param->io_len = secsize - m;
+        if(param->io_len > len){
+            param->remain_len = 0;
+            param->io_len = len;
+        }else{
+            param->remain_len = len - param->io_len;
+        }
+    }else{ //基准点
+        lm = len % secsize;
+        ln = len / secsize;
+        if(!lm){ //刚好倍数大小
+            param->sector_count = ln;
+            param->sector_index = n;
+            param->offset = 0;
+            param->io_len = len; 
+            param->remain_len = 0;
+            param->need_buffer = 0;           
+        }else{ //有多余
+            if(ln){ //不是最后一块
+                param->sector_count = ln;
+                param->sector_index = n;
+                param->offset = 0;
+                param->io_len = ln * secsize; 
+                param->remain_len = len - param->io_len;
+                param->need_buffer = 0;           
+            }else{ //最后一块
+                param->sector_count = 1;
+                param->sector_index = n;
+                param->offset = 0;
+                param->io_len = len; 
+                param->remain_len = 0;
+                param->need_buffer = 1; 
+            }
+        }
+    }
+}
+
+
+int disk_read(int fd, void* buf, int len){
+    int pos;
+    int readed = 0;   
+    int ret;
+    disk_io_param param;
+    uint8_t* tempbuf = NULL;
+    int index = DISK_FD_GET_INDEX(fd);
+    if(index >= MAX_DISK_COUNT)return -1; 
+    if(!disk_info_[index].inited)return -1;
+
+    pos = disk_info_[index].rw_pos;
+    param.remain_len = len;
+    while(param.remain_len){
+        disk_calc_io_param(disk_info_[index].sector_size, disk_info_[index].sector_count, pos, param.remain_len, &param);
+        //printf("    read sec:%d\tnum:%d\tpos:%d\toff:%d\tlen:%d\n", param.sector_index, param.sector_count, pos, param.offset, param.io_len);
+        if(param.need_buffer){ //需要临时buffer
+            if(!tempbuf)tempbuf = (uint8_t*)malloc(disk_info_[index].sector_size);
+            if(!tempbuf)goto error;            
+        }else{
+            tempbuf = (uint8_t*)buf + readed;
+        }
+        ret = disk_drvs_[index]->disk_read(index, tempbuf, param.sector_index, param.sector_count);
+        if(ret)goto error;
+
+        if(param.need_buffer){ //如果读到了临时buffer
+            memcpy((uint8_t*)buf + readed, tempbuf + param.offset, param.io_len);         
+        }
+
+        readed += param.io_len;
+        pos += param.io_len;
+        disk_info_[index].rw_pos = pos;
+    }
+
+    goto finish;
+error:
+    readed = -1;
+finish:    
+    if(tempbuf)free(tempbuf);    
+    return readed;
+}
+
+int disk_write(int fd, const void* buf, int len){
+    int pos;
+    int writed = 0;   
+    int ret;
+    int secindex, seccount;
+    disk_io_param param;
+    uint8_t* tempbuf = NULL;
+    int index = DISK_FD_GET_INDEX(fd);
+    if(index >= MAX_DISK_COUNT)return -1; 
+    if(!disk_info_[index].inited)return -1;
+
+    pos = disk_info_[index].rw_pos;
+    param.remain_len = len;
+    while(param.remain_len){
+        disk_calc_io_param(disk_info_[index].block_size, disk_info_[index].block_count, pos, param.remain_len, &param);
+        //printf("    read sec:%d\tnum:%d\tpos:%d\toff:%d\tlen:%d\n", param.sector_index, param.sector_count, pos, param.offset, param.io_len);
+        secindex = param.sector_index * disk_info_[index].fact;
+        seccount = param.sector_count * disk_info_[index].fact;
+        if(param.need_buffer){ //需要临时buffer
+            if(!tempbuf)tempbuf = (uint8_t*)malloc(disk_info_[index].block_size);
+            if(!tempbuf)goto error; 
+
+            //先读到临时buffer，以保留原有数据
+            //ret = disk_drvs_[index]->disk_read(index, tempbuf, secindex, seccount);                
+            //if(ret)goto error;
+
+            memcpy(tempbuf + param.offset, buf, param.io_len);
+
+        }else{
+            tempbuf = (uint8_t*)buf + writed;
+        }
+        ret = disk_drvs_[index]->disk_write(index, tempbuf, secindex, seccount);
+        if(ret)goto error;
+        
+        writed += param.io_len;
+        pos += param.io_len;
+        disk_info_[index].rw_pos = pos;
+    }
+
+    goto finish;
+error:
+    writed = -1;
+finish:    
+    if(tempbuf)free(tempbuf);    
+    return writed;    
+}
 
 
 //======================== posix api =============================
