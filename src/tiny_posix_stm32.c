@@ -39,8 +39,10 @@ int stdio_write(int fd, const void* buf, int len){
 
 static void default_clock_init(){
     __HAL_RCC_PWR_CLK_ENABLE();
-    __HAL_RCC_AFIO_CLK_ENABLE();
 
+#ifdef __HAL_RCC_AFIO_CLK_ENABLE    
+    __HAL_RCC_AFIO_CLK_ENABLE();
+#endif
     __HAL_RCC_GPIOA_CLK_ENABLE();
     __HAL_RCC_GPIOB_CLK_ENABLE();   
     __HAL_RCC_GPIOC_CLK_ENABLE();
@@ -651,6 +653,68 @@ int i2c_write(int fd, const void* buf, int len){
     return -1;
 }
 
+//===================== rom ===================
+
+int rom_read(int fd, void* buf, int len){
+    void* addr = ROM_FD_GET_ADDRESS(fd);
+    memcpy(buf, addr, len);
+    return len;
+}
+
+
+int rom_write(int fd, const void* buf, int buflen){
+    int ret = -1;   
+#if defined(FLASH_PAGE_SIZE) && defined(FLASH_TYPEERASE_PAGES)
+    FLASH_EraseInitTypeDef pEraseInit;
+    uint32_t error = 0;
+    uint64_t* ptr = (uint64_t*)buf;
+    size_t remainlen = buflen;
+    HAL_StatusTypeDef state;
+    uint64_t last = (uint64_t)(-1);
+    
+    uint32_t addr = (uint32_t)(uintptr_t)ROM_FD_GET_ADDRESS(fd);
+    if(!addr || buflen>FLASH_PAGE_SIZE){
+        errno = EINVAL;
+        return -1;        
+    }    
+
+    HAL_FLASH_Unlock();
+
+    pEraseInit.PageAddress = addr;
+    pEraseInit.NbPages = 1;
+    pEraseInit.TypeErase = FLASH_TYPEERASE_PAGES;
+    state = HAL_FLASHEx_Erase(&pEraseInit, &error);
+    if(state != HAL_OK){        
+        errno = EFAULT;
+        goto finish;
+    }
+
+    while(remainlen >= 8){
+        state = HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, addr, *ptr);
+        if (state != HAL_OK){
+            errno = EIO;
+            goto finish;
+        }     
+        ptr += 1;
+        addr += 8;
+        remainlen -= 8;
+    }
+
+    if(remainlen>0 && remainlen<8){
+        memcpy(&last, ptr, remainlen);        
+        state = HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, addr, last);
+        if (state != HAL_OK){
+            errno = EIO;
+            goto finish;
+        }         
+    }
+
+    ret = buflen;
+finish:
+    HAL_FLASH_Lock();    
+#endif
+    return ret;    
+}
 
 //===================== lcd ===================
 #define MAX_LCD_COUNT 1
@@ -713,88 +777,7 @@ static Diskio_drvTypeDef* disk_drvs_[MAX_DISK_COUNT];
 static disk_info disk_info_[MAX_DISK_COUNT];
 
 
-//rom disk 读写内部flash
-static int rom_disk_initialize(uint8_t id) {return 0;}
-static int rom_disk_status(uint8_t id) {return 0;}
 
-static DRESULT rom_disk_read(uint8_t id, uint8_t* buf, unsigned int sector, unsigned int count){
-    void* addr = (void*)(uintptr_t)(sector * 1);
-    memcpy(buf, addr, count);
-    return 0;
-}
-static DRESULT rom_disk_write(uint8_t id, const uint8_t* buf, unsigned int sector, unsigned int count){
-    FLASH_EraseInitTypeDef pEraseInit;
-    uint32_t error = 0;
-    uint32_t addr = (uintptr_t)(sector * 1);
-    uint64_t* ptr = (uint64_t*)buf;
-    size_t remainlen = count;
-    HAL_StatusTypeDef state;    
-    DRESULT ret = RES_ERROR;
-    if(count % FLASH_PAGE_SIZE){
-        errno = EINVAL;
-        return RES_ERROR;        
-    } 
-
-    HAL_FLASH_Unlock();
-
-    pEraseInit.PageAddress = addr;
-    pEraseInit.NbPages = count / FLASH_PAGE_SIZE;
-    pEraseInit.TypeErase = FLASH_TYPEERASE_PAGES;
-    state = HAL_FLASHEx_Erase(&pEraseInit, &error);
-    if(state != HAL_OK){        
-        errno = EFAULT;
-        goto finish;
-    }
-
-    while(remainlen>0){
-        state = HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, addr, *ptr);
-        if (state != HAL_OK){
-            errno = EIO;
-            goto finish;
-        }     
-        ptr += 1;
-        addr += 8;
-        remainlen -= 8;
-    }
-
-    ret = 0;
-finish:
-    HAL_FLASH_Lock();
-    return ret;    
-}
-static DRESULT rom_disk_ioctl(uint8_t id, uint8_t cmd, void* buf){
-    unsigned int* pval = (unsigned int*)buf;
-    uint16_t kb;
-    if(cmd == CTRL_SYNC){
-        return RES_OK;
-    }    
-    if(cmd == GET_SECTOR_COUNT){
-        kb = *((uint16_t*)(uintptr_t)(FLASH_SIZE_DATA_REGISTER));
-        *pval = kb * 1024;
-        return RES_OK;
-    }
-    if(cmd == GET_SECTOR_SIZE){
-        *pval = 1;
-        return RES_OK;
-    }
-    if(cmd == GET_BLOCK_SIZE){
-        *pval = FLASH_PAGE_SIZE;
-        return RES_OK;
-    }
-    return RES_PARERR;
-}
-
-static Diskio_drvTypeDef Diskio_drv_rom_ = {
-    rom_disk_initialize,
-    rom_disk_status,
-    rom_disk_read,
-    rom_disk_write,
-    rom_disk_ioctl,
-};
-
-int disk_init_rom(int fd){
-    return disk_init(fd, &Diskio_drv_rom_);
-}
 
 int disk_init(int fd, Diskio_drvTypeDef* driver){    
     int index = DISK_FD_GET_INDEX(fd);    
@@ -982,8 +965,8 @@ int disk_write(int fd, const void* buf, int len){
             if(!tempbuf)goto error; 
 
             //先读到临时buffer，以保留原有数据
-            //ret = disk_drvs_[index]->disk_read(index, tempbuf, secindex, seccount);                
-            //if(ret)goto error;
+            ret = disk_drvs_[index]->disk_read(index, tempbuf, secindex, seccount);                
+            if(ret)goto error;
 
             memcpy(tempbuf + param.offset, buf, param.io_len);
 
@@ -1020,8 +1003,11 @@ typedef struct file_ops{
 
 static file_ops file_ops_[] = {
     {stdio_read, stdio_write, NULL},
-    {gpio_read,  gpio_write, NULL},
-    {uart_read,  uart_write, NULL}, 
+    {gpio_read,  gpio_write,  NULL},
+    {uart_read,  uart_write,  NULL}, 
+    {spi_read,   spi_write,   NULL}, 
+    {i2c_read,   i2c_write,   NULL}, 
+    {rom_read,   rom_write,  NULL}, 
 };
 
 

@@ -192,6 +192,7 @@ void test_loop_led(){
 int main(){
     char buf[64];    
     int ret;
+    int fd;
    
 #ifdef GPIO_AF12_FSMC
     test_fsmc();
@@ -204,12 +205,25 @@ int main(){
 #ifdef TEST_I2C1
     //test_i2c();
 #endif
-    test_loop_led();
+    //test_loop_led();
     //test_sleep_mode();
     //FILE* f = fopen("a","1");
     //printf("a");
     //fwrite("aaa",1,2,f);
     //fclose(f);
+    fd = open("config.xml", O_WRONLY|O_CREAT);
+    if(fd>0){        
+        write(fd, "<a></a>", 8);
+        close(fd);
+    }    
+
+    fd = open("config.xml", O_RDONLY);
+    if(fd>0){
+        ret = read(fd, buf, 64);
+        write(STDOUT_FILENO, buf, ret);
+        close(fd);
+    }
+
     while(1){
         //loop_leds();
 

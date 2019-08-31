@@ -28,8 +28,9 @@ extern "C" {
 #define FD_TYPE_UART  0x02000000
 #define FD_TYPE_SPI   0x03000000
 #define FD_TYPE_I2C   0x04000000
-#define FD_TYPE_DISK  0x05000000
-#define FD_TYPE_LCD   0x06000000
+#define FD_TYPE_ROM   0x05000000 //内部flash，只读
+#define FD_TYPE_DISK  0x06000000 //外部flash、sdcard等，由驱动实现
+#define FD_TYPE_LCD   0x07000000
 //#define FD_TYPE_FLASH 0x05000000 //内部flash
 
 
@@ -199,6 +200,15 @@ int i2c_test(int fd);
 int i2c_read(int fd, void* buf, int len);
 int i2c_write(int fd, const void* buf, int len);
 
+//===================== rom ===================
+//ROM_FD(0x07ff) = 0x080007ff
+#define ROM_FD(addr) ((addr)|FD_TYPE_ROM)
+#define ROM_FD_GET_ADDRESS(fd) ((void*)(uintptr_t)((fd & 0xffffff)|0x08000000))
+
+
+//read/write 函数
+int rom_read(int fd, void* buf, int len);
+int rom_write(int fd, const void* buf, int len);
 
 
 //===================== lcd ===================
@@ -273,8 +283,6 @@ typedef struct{
 //初始化一个外部存储为disk
 int disk_init(int fd, Diskio_drvTypeDef* driver);
 
-//初始化内部flash为disk
-int disk_init_rom(int fd);
 
 int disk_lseek(int fd, int offset, int how);
 int disk_read(int fd, void* buf, int len);
