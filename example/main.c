@@ -145,26 +145,27 @@ void test_i2c(){
 }
 
 #endif
-/*
+
 void test_sleep_mode(){
-    char buf[64];
+    //char buf[64];
     int t0 = HAL_GetTick();
     int c0 = SysTick->VAL;
-    int t1, c1, len;
+    int t1, c1;
     
     sleep(2);
-    len = sprintf(buf, "enter sleep");
+    printf("enter sleep");
     //printf(SERIAL2, buf, len);
-
+    gpio_set(leds_[0]);
     HAL_SuspendTick();    
     HAL_PWR_EnterSLEEPMode(PWR_MAINREGULATOR_ON, PWR_SLEEPENTRY_WFI);     
     HAL_ResumeTick();
     t1 = HAL_GetTick();
     c1 = SysTick->VAL;
-    len = sprintf(buf, "leave sleep %d~%d %d~%d",t0,t1,c0,c1);
+    printf("leave sleep %d~%d %d~%d",t0,t1,c0,c1);
     //uart_write(SERIAL2, buf, len);
+    
 }
-*/
+
 
 void on_key(){
     //gpio_set(LED1);
@@ -197,7 +198,10 @@ int main(){
 #ifdef GPIO_AF12_FSMC
     test_fsmc();
 #endif
-    //gpio_set_irq(KEY1, on_key);
+    leds_[0] = open("/leds/led0", O_WRONLY);
+
+    fd = open("/keys/key0", O_RDONLY);
+    gpio_set_irq(fd, on_key);
     
 #ifdef TEST_SPI1
     //test_spi();
@@ -206,27 +210,31 @@ int main(){
     //test_i2c();
 #endif
     //test_loop_led();
-    //test_sleep_mode();
+    test_sleep_mode();
     //FILE* f = fopen("a","1");
     //printf("a");
     //fwrite("aaa",1,2,f);
     //fclose(f);
+    /*
     fd = open("config.xml", O_WRONLY|O_CREAT);
     if(fd>0){        
         write(fd, "<a></a>", 8);
         close(fd);
-    }    
-
+    }    */
     fd = open("config.xml", O_RDONLY);
     if(fd>0){
         ret = read(fd, buf, 64);
-        write(STDOUT_FILENO, buf, ret);
+        if(ret>0)write(STDOUT_FILENO, buf, ret);
         close(fd);
     }
-
+    while(1){
+        gpio_toggle(leds_[0]);
+        sleep(1);
+    }
+    
     while(1){
         //loop_leds();
-
+        gpio_toggle(leds_[0]);
         printf("hello world\n");
 
         ret = read(STDIN_FILENO, buf, 64);

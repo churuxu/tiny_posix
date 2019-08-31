@@ -12,7 +12,7 @@
 
 int System_Open(const char* name, int flags){
     MOUNT_FD("/leds/led0", LED0);
-
+    MOUNT_FD("/keys/key0", KEY1);
     MOUNT_FD("config.xml", ROM_FD(0xf800));
     return -1;
 }
