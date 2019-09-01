@@ -1,3 +1,6 @@
+#pragma once
+
+#include "lcd_console.h"
 
 #define LED0 GPIO_FD(PORTE, 3)
 #define LED1 GPIO_FD(PORTE, 4)
@@ -20,6 +23,13 @@ int System_Open(const char* name, int flags){
 extern LCD_DrvTypeDef* lcd_drv;
 
 void System_Config(){
+    int fsmcpins[] = {
+        GPIO_FD(PORTF, 10),
+        GPIO_MULTI_FD(PORTD, GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_4|GPIO_PIN_5|GPIO_PIN_8|GPIO_PIN_9|GPIO_PIN_10|GPIO_PIN_14|GPIO_PIN_15),
+        GPIO_MULTI_FD(PORTE, GPIO_PIN_7|GPIO_PIN_8|GPIO_PIN_9|GPIO_PIN_10|GPIO_PIN_11|GPIO_PIN_12|GPIO_PIN_13|GPIO_PIN_14|GPIO_PIN_15),
+        GPIO_MULTI_FD(PORTG, GPIO_PIN_2|GPIO_PIN_12),        
+    };
+
     gpio_init(LED0, GPIO_MODE_OUTPUT_PP, GPIO_PULLUP);
     gpio_init(LED1, GPIO_MODE_OUTPUT_PP, GPIO_PULLUP);
     gpio_init(LED2, GPIO_MODE_OUTPUT_PP, GPIO_PULLUP);
@@ -29,9 +39,14 @@ void System_Config(){
     uart_init(SERIAL1, UART3_DEFAULT_PINS, B9600|CS8);
     uart_init(SERIAL2, UART5_DEFAULT_PINS, B9600|CS8);
 
-    stdio_set_fd(SERIAL2,SERIAL2,SERIAL2);
+    
 
-    //lcd_init(LCD_FD(1), lcd_drv, 0);
+    fsmc_init(fsmcpins, 4, FSMC_NORSRAM_BANK4);
+    
+    lcd_console_init();
+
+    //stdio_set_fd(SERIAL2,SERIAL2,SERIAL2);
+    stdio_set_func(NULL,lcd_console_write,lcd_console_write);
 }
 
 

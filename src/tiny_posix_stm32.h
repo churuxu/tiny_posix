@@ -36,13 +36,17 @@ extern "C" {
 
 #define FD_GET_TYPE(fd) (fd>>24)
 
+
+
 typedef void (*irq_handler)();
+typedef int (*read_func)(int fd, void* buf, int len);
+typedef int (*write_func)(int fd, const void* buf, int len);
 
 void tiny_posix_init();
 
 //修改stdout stdin stderr
 void stdio_set_fd(int in, int out, int err);
-
+void stdio_set_func(read_func in, write_func out, write_func err);
 
 //gpio port names
 #define PORTA 0x000000
@@ -209,6 +213,11 @@ int i2c_write(int fd, const void* buf, int len);
 //read/write 函数
 int rom_read(int fd, void* buf, int len);
 int rom_write(int fd, const void* buf, int len);
+
+
+//===================== fsmc ===================
+
+void* fsmc_init(int* pins, int count, uint32_t bank);
 
 
 //===================== lcd ===================

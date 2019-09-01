@@ -11,6 +11,9 @@
 
 
 static int stdio_fds_[3];
+static read_func stdin_func_;
+static write_func stdout_func_;
+static write_func stderr_func_;
 
 void stdio_set_fd(int in, int out, int err){
     stdio_fds_[0] = in;
@@ -18,8 +21,17 @@ void stdio_set_fd(int in, int out, int err){
     stdio_fds_[2] = err;
 }
 
+void stdio_set_func(read_func in, write_func out, write_func err){
+    stdin_func_ = in;
+    stdout_func_ = out;
+    stderr_func_ = err;
+}
+
 //stdio 输入
 int stdio_read(int fd, void* buf, int len){
+    if(stdin_func_){
+        return stdin_func_(fd, buf, len);
+    }
     if(fd == STDIN_FILENO && stdio_fds_[0]){
         return _tp_read(stdio_fds_[0], buf, len);
     }
@@ -27,12 +39,22 @@ int stdio_read(int fd, void* buf, int len){
 }
 //stdio 输出
 int stdio_write(int fd, const void* buf, int len){
-    if(fd == STDOUT_FILENO && stdio_fds_[1]){
-        return _tp_write(stdio_fds_[1], buf, len);
+    if(fd == STDOUT_FILENO){
+        if(stdout_func_){
+            return stdout_func_(fd, buf, len);
+        }
+        if(stdio_fds_[1]){
+            return _tp_write(stdio_fds_[1], buf, len);
+        }
     }
-    if(fd == STDERR_FILENO && stdio_fds_[2]){
-        return _tp_write(stdio_fds_[2], buf, len);
-    }    
+    if(fd == STDERR_FILENO){
+        if(stderr_func_){
+            return stderr_func_(fd, buf, len);
+        }
+        if(stdio_fds_[1]){
+            return _tp_write(stdio_fds_[2], buf, len);
+        }
+    }
     return -1;
 }
 
@@ -716,6 +738,70 @@ finish:
     return ret;    
 }
 
+//===================== fsmc ===================
+
+
+void* fsmc_init(int* pins, int count, uint32_t bank){
+#ifdef GPIO_AF12_FSMC
+    static SRAM_HandleTypeDef fsmc;
+    FSMC_NORSRAM_TimingTypeDef Timing;
+    int i;
+    __HAL_RCC_FSMC_CLK_ENABLE();
+
+    gpio_init(pins[0], GPIO_MODE_OUTPUT_PP, GPIO_PULLUP);
+    for(i=1;i<count;i++){
+        gpio_init_ex(pins[i], GPIO_MODE_AF_PP, GPIO_PULLUP, GPIO_AF12_FSMC);
+    }
+
+    fsmc.Instance = FSMC_NORSRAM_DEVICE;
+    fsmc.Extended = FSMC_NORSRAM_EXTENDED_DEVICE;
+
+    fsmc.Init.NSBank = bank;
+    fsmc.Init.DataAddressMux = FSMC_DATA_ADDRESS_MUX_DISABLE;
+    fsmc.Init.MemoryType = FSMC_MEMORY_TYPE_SRAM;
+    fsmc.Init.MemoryDataWidth = FSMC_NORSRAM_MEM_BUS_WIDTH_16;
+    fsmc.Init.BurstAccessMode = FSMC_BURST_ACCESS_MODE_DISABLE;
+    fsmc.Init.WaitSignalPolarity = FSMC_WAIT_SIGNAL_POLARITY_LOW;
+    fsmc.Init.WrapMode = FSMC_WRAP_MODE_DISABLE;
+    fsmc.Init.WaitSignalActive = FSMC_WAIT_TIMING_BEFORE_WS;
+    fsmc.Init.WriteOperation = FSMC_WRITE_OPERATION_ENABLE;
+    fsmc.Init.WaitSignal = FSMC_WAIT_SIGNAL_DISABLE;
+    fsmc.Init.ExtendedMode = FSMC_EXTENDED_MODE_DISABLE;
+    fsmc.Init.AsynchronousWait = FSMC_ASYNCHRONOUS_WAIT_DISABLE;
+    fsmc.Init.WriteBurst = FSMC_WRITE_BURST_DISABLE;
+    //fsmc.Init.PageSize = 0;
+     /* Timing */
+    Timing.AddressSetupTime = 5;
+    Timing.AddressHoldTime = 15;
+    Timing.DataSetupTime = 8;
+    Timing.BusTurnAroundDuration = 1;
+    Timing.CLKDivision = 16;
+    Timing.DataLatency = 17;
+    Timing.AccessMode = FSMC_ACCESS_MODE_A;    
+  
+    if (HAL_SRAM_Init(&fsmc, &Timing, NULL) != HAL_OK)
+    {
+        return NULL;
+    }
+    HAL_Delay(10);
+    if(bank == FSMC_NORSRAM_BANK1){
+        return (void*)(uintptr_t)0x60000000;
+    }
+    if(bank == FSMC_NORSRAM_BANK2){
+        return (void*)(uintptr_t)0x64000000;
+    }
+    if(bank == FSMC_NORSRAM_BANK3){
+        return (void*)(uintptr_t)0x68000000;
+    }
+    if(bank == FSMC_NORSRAM_BANK4){
+        return (void*)(uintptr_t)0x6C000000;
+    } 
+#endif
+    return NULL;
+}
+
+
+
 //===================== lcd ===================
 #define MAX_LCD_COUNT 1
 
@@ -1049,8 +1135,17 @@ unsigned int _tp_sleep(unsigned int seconds){
     return 0;
 }
 unsigned int _tp_usleep(unsigned int micro_seconds){
-    HAL_Delay(micro_seconds / 1000);
-    return 0;
+   //HAL_Delay(micro_seconds / 1000);
+    int ms = micro_seconds / 1000;
+    if(ms){
+        HAL_Delay(ms);
+        return 0;
+    }else{
+        while(micro_seconds>0){
+            micro_seconds -- ;
+        }
+    }
+    return micro_seconds;
 }
 
 _tp_clock_t _tp_clock(){

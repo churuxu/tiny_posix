@@ -64,7 +64,7 @@ if(NOT EXISTS ${HAL_DRIVER_DIR}/Inc/stm32f4xx_hal_conf.h)
 	configure_file(${HAL_DRIVER_DIR}/Inc/stm32f4xx_hal_conf_template.h ${HAL_DRIVER_DIR}/Inc/stm32f4xx_hal_conf.h COPYONLY)
 endif()
 
-set(EXPORT_INCS ${HAL_DRIVER_DIR}/Inc ${CMSIS_ST_DIR}/Include ${CMSIS_DIR}/Include ${BSP_INC})
+set(EXPORT_INCS ${HAL_DRIVER_DIR}/Inc ${CMSIS_ST_DIR}/Include ${CMSIS_DIR}/Include )
 
 include_directories(${EXPORT_INCS})
 
