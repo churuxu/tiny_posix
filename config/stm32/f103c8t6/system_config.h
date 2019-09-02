@@ -14,6 +14,7 @@ int System_Open(const char* name, int flags){
     MOUNT_FD("/leds/led0", LED0);
     MOUNT_FD("/keys/key0", KEY1);
     MOUNT_FD("config.xml", ROM_FD(0xf800));
+    MOUNT_FD("/dev/ttyS0", SERIAL2);
     return -1;
 }
 
@@ -26,7 +27,7 @@ void System_Config(){
 
     i2c_init(TEST_I2C1, I2C1_DEFAULT_PINS, 0x70, 0xA0); 
 
-    stdio_set_fd(SERIAL2,SERIAL2,SERIAL2);   
+    //stdio_set_fd(SERIAL2,SERIAL2,SERIAL2);   
 }
 
 

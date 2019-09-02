@@ -2,11 +2,11 @@
 
 #include "lcd_console.h"
 
-#define LED0 GPIO_FD(PORTE, 3)
-#define LED1 GPIO_FD(PORTE, 4)
-#define LED2 GPIO_FD(PORTG, 9)
+#define LED0 GPIO_FD_REVERSE(PORTE, 3)
+#define LED1 GPIO_FD_REVERSE(PORTE, 4)
+#define LED2 GPIO_FD_REVERSE(PORTG, 9)
 
-#define KEY1 GPIO_FD(PORTF, 9)
+#define KEY1 GPIO_FD_REVERSE(PORTF, 9)
 
 #define SERIAL1 UART_FD(3)
 #define SERIAL2 UART_FD(5)
@@ -17,6 +17,8 @@ int System_Open(const char* name, int flags){
     MOUNT_FD("/leds/led0", LED0);
     MOUNT_FD("/leds/led1", LED1);
     MOUNT_FD("/leds/led2", LED2);
+    MOUNT_FD("/keys/key0", KEY1);
+    MOUNT_FD("/dev/ttyS0", SERIAL1);
     return -1;
 }
 
@@ -34,12 +36,11 @@ void System_Config(){
     gpio_init(LED1, GPIO_MODE_OUTPUT_PP, GPIO_PULLUP);
     gpio_init(LED2, GPIO_MODE_OUTPUT_PP, GPIO_PULLUP);
 
-    gpio_init(KEY1, GPIO_MODE_IT_RISING, 0);
+    gpio_init(KEY1, GPIO_MODE_IT_RISING_FALLING, 0);
 
     uart_init(SERIAL1, UART3_DEFAULT_PINS, B9600|CS8);
     uart_init(SERIAL2, UART5_DEFAULT_PINS, B9600|CS8);
-
-    
+  
 
     fsmc_init(fsmcpins, 4, FSMC_NORSRAM_BANK4);
     

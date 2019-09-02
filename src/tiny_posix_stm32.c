@@ -346,7 +346,7 @@ int uart_init(int fd, int tx, int rx, int flags){
     }
     
     gpio_init_ex(tx, GPIO_MODE_AF_PP, GPIO_NOPULL, af);
-    gpio_init_ex(rx, GPIO_MODE_INPUT, GPIO_NOPULL, af);
+    gpio_init_ex(rx, GPIO_MODE_AF_PP, GPIO_NOPULL, af);
     
     return uart_set_flags(fd, flags);    
 }
@@ -1158,47 +1158,83 @@ _tp_clock_t _tp_clock(){
 
 
 
-
-#define HANDLE_GPIO_IRQ(pin, index) \
-    if(__HAL_GPIO_EXTI_GET_IT(pin) != RESET){\
-        __HAL_GPIO_EXTI_CLEAR_IT(pin);\
-        if(gpio_irqs_[index])gpio_irqs_[index]();\
-    }
-
 //============= 各系统中断 ===============
+
+void HAL_GPIO_EXTI_Callback(uint16_t pin){
+    uint8_t index = 0;    
+    if( pin > 0 ) {
+        while( pin != 0x01 ){
+            pin = pin >> 1;
+            index++;
+        }
+    }
+    if(gpio_irqs_[index]){
+        gpio_irqs_[index]();
+    }
+}
+
 void SysTick_Handler(){ 
     HAL_IncTick();
     HAL_SYSTICK_IRQHandler(); 
 }
 void EXTI0_IRQHandler(){
-    HANDLE_GPIO_IRQ(GPIO_PIN_0, 0);
+    HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_0);
 }
 void EXTI1_IRQHandler(){
-    HANDLE_GPIO_IRQ(GPIO_PIN_1, 1);
+    HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_1);
 }
 void EXTI2_IRQHandler(){
-    HANDLE_GPIO_IRQ(GPIO_PIN_2, 2);
+    HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_2);
 }
 void EXTI3_IRQHandler(){
-    HANDLE_GPIO_IRQ(GPIO_PIN_3, 3);
+    HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_3);
 }
 void EXTI4_IRQHandler(){
-    HANDLE_GPIO_IRQ(GPIO_PIN_4, 4);
+    HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_4);
 }
 void EXTI9_5_IRQHandler(){
-    HANDLE_GPIO_IRQ(GPIO_PIN_5, 5);
-    HANDLE_GPIO_IRQ(GPIO_PIN_6, 6);
-    HANDLE_GPIO_IRQ(GPIO_PIN_7, 7);
-    HANDLE_GPIO_IRQ(GPIO_PIN_8, 8);
-    HANDLE_GPIO_IRQ(GPIO_PIN_9, 9);
+    HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_5);
+    HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_6);
+    HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_7);
+    HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_8);
+    HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_9);
 }
 void EXTI15_10_IRQHandler(){
-    HANDLE_GPIO_IRQ(GPIO_PIN_10, 10);
-    HANDLE_GPIO_IRQ(GPIO_PIN_11, 11);
-    HANDLE_GPIO_IRQ(GPIO_PIN_12, 12);
-    HANDLE_GPIO_IRQ(GPIO_PIN_13, 13);
-    HANDLE_GPIO_IRQ(GPIO_PIN_14, 14);
-    HANDLE_GPIO_IRQ(GPIO_PIN_15, 15);
+    HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_10);
+    HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_11);
+    HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_12);
+    HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_13);
+    HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_14);
+    HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_15);
 }
 
 
+
+
+void HAL_UART_ErrorCallback(UART_HandleTypeDef* handle){
+    //HAL_UART_Receive_IT( &UartHandle, &RxData, 1 );
+}
+
+void USART1_IRQHandler(){
+
+}
+#ifdef USART2
+void USART2_IRQHandler(){
+    
+}
+#endif
+#ifdef USART3
+void USART3_IRQHandler(){
+    //HAL_UART_IRQHandler(&uarts_[2]);
+}
+#endif
+#ifdef UART4
+void UART4_IRQHandler(){
+    
+}
+#endif
+#ifdef UART5
+void UART5_IRQHandler(){
+    
+}
+#endif
