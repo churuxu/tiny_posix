@@ -17,7 +17,7 @@ add_custom_target(exportbin ALL DEPENDS ${PROJNAME}.bin)
 
 # ------------- flash command -------------
 
-set(JLINKCMD "r\r\n")
+set(JLINKCMD "")
 set(JLINKCMD "${JLINKCMD}h\r\n")
 set(JLINKCMD "${JLINKCMD}loadfile ${CMAKE_BINARY_DIR}/${PROJNAME}.bin 0x08000000\r\n")
 set(JLINKCMD "${JLINKCMD}g\r\n")
@@ -25,11 +25,11 @@ set(JLINKCMD "${JLINKCMD}r\r\n")
 set(JLINKCMD "${JLINKCMD}q\r\n")
 file(WRITE ${CMAKE_BINARY_DIR}/jlink.txt ${JLINKCMD})
 
-add_custom_target(flash DEPENDS ${PROJNAME}.elf COMMAND JLink -device ${CPU_NAME} -if JTAG -speed auto -CommanderScript ${CMAKE_BINARY_DIR}/jlink.txt)
+add_custom_target(flash DEPENDS ${PROJNAME}.elf COMMAND JLink -device ${CPU_NAME} -if SWD -speed auto -CommanderScript ${CMAKE_BINARY_DIR}/jlink.txt)
 
 # ------------- gdb server command -------------
 
-set(GDB_SERVER_CMD "JLinkGDBServerCL -nogui -singlerun -select USB -device ${CPU_NAME} -endian little -if JTAG -speed auto -noir -LocalhostOnly")
+set(GDB_SERVER_CMD "JLinkGDBServerCL -nogui -singlerun -select USB -device ${CPU_NAME} -endian little -if SWD -speed auto -noir -LocalhostOnly")
 
 add_custom_target(gdb_server DEPENDS ${PROJNAME}.elf COMMAND ${GDB_SERVER_CMD})
 

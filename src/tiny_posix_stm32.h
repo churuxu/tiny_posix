@@ -41,6 +41,8 @@ extern "C" {
 typedef void (*irq_handler)();
 typedef int (*read_func)(int fd, void* buf, int len);
 typedef int (*write_func)(int fd, const void* buf, int len);
+typedef int (*fcntl_func)(int fd, int cmd, void* v);
+typedef int (*poll_func)(int fd, int event);
 
 void tiny_posix_init();
 
@@ -140,16 +142,17 @@ int gpio_write(int fd, const void* buf, int len);
 #define UART4_DEFAULT_PINS GPIO_FD(PORTC, 10), GPIO_FD(PORTC, 11)
 #define UART5_DEFAULT_PINS GPIO_FD(PORTC, 12), GPIO_FD(PORTD, 2)
 
-//初始化串口， flags示例 B9600|CS8
-int uart_init(int fd, int txpin, int rxpin, int flags);
+//初始化串口， attr示例 B9600|CS8
+int uart_init(int fd, int txpin, int rxpin, int attr);
 
-//修改串口参数， flags示例 B9600|CS8
-int uart_set_flags(int fd, int flags);
+//修改串口参数， attr示例 B9600|CS8
+int uart_set_attr(int fd, int attr);
 
 //read/write 函数
 int uart_read(int fd, void* buf, int len);
 int uart_write(int fd, const void* buf, int len);
-
+int uart_fcntl(int fd, int cmd, void* val);
+int uart_poll(int fd, int event);
 
 //============================= spi =============================
 

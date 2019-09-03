@@ -10,7 +10,7 @@ if not exist "%OUT_DIR%\sys" md  "%OUT_DIR%\sys"
 
 set TEST_FILE=%TEMP%\t.c
 
-set INC_FILE=posix_runtime.h
+set INC_FILE=tiny_posix.h
 
 if "%CC%" == "" set CC=gcc
 echo testing compiler %CC% ...

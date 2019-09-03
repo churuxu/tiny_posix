@@ -1,13 +1,15 @@
 #include "tiny_posix.h"
-
 #include "system_config.h"
+
+#include <stdarg.h>
 
 #ifndef GPIO_SPEED_FREQ_HIGH
 #define GPIO_SPEED_FREQ_HIGH GPIO_SPEED_FAST
 #endif
 
-#define UART_ATTR_GET 0
-#define UART_ATTR_SET 1
+#define FCNTL_CMD_BASE 0x0C00
+#define UART_ATTR_GET (FCNTL_CMD_BASE|1)
+#define UART_ATTR_SET (FCNTL_CMD_BASE|2)
 
 
 static int stdio_fds_[3];
@@ -37,6 +39,7 @@ int stdio_read(int fd, void* buf, int len){
     }
     return -1;
 }
+
 //stdio 输出
 int stdio_write(int fd, const void* buf, int len){
     if(fd == STDOUT_FILENO){
@@ -103,6 +106,113 @@ void tiny_posix_init(){
     System_Config();    
 }
 
+//===============  fifo ================
+
+typedef struct fifo{
+	uint8_t* begin;  //buffer开头
+	uint8_t* end;	//buffer结尾
+	uint8_t* posread;  //读位置
+	uint8_t* poswrite;	 //写位置	
+}fifo;
+
+
+static void fifo_init(fifo* result, void* buf, size_t sz){
+	result->begin = (uint8_t*)buf;
+	result->end = (uint8_t*)buf + sz;	
+	result->poswrite = result->begin;
+	result->posread = result->begin;
+}
+/*
+static int fifo_is_full(fifo* f){
+    uint8_t* nextpos = f->poswrite; 
+    if(nextpos == f->end){
+        nextpos = f->begin;
+    }else{
+        nextpos ++;
+    }
+    return nextpos == f->posread;
+}*/
+
+static int fifo_is_empty(fifo* f){
+    return f->posread == f->poswrite;
+}
+static int fifo_push(fifo* f, uint8_t ch){
+    uint8_t* posread;
+    uint8_t* nextpos; 
+    posread = f->posread; 
+    nextpos = f->poswrite;
+    if(nextpos == f->end){
+        nextpos = f->begin;
+    }else{
+        nextpos ++;
+    }
+    if(nextpos == posread){ //下一个字节 = 读位置，说明已满
+        return -1;
+    }
+    *f->poswrite = ch;
+    f->poswrite = nextpos;
+    return 0;
+}
+
+static int fifo_pop(fifo* f, uint8_t* pch){
+    uint8_t* poswrite; 
+    poswrite = f->poswrite;
+    if(f->posread == poswrite){ //当前位置 = 写位置，说明已空
+        return -1;
+    }        
+    *pch = *f->posread;
+    if(f->posread == f->end){
+        f->posread = f->begin;
+    }else{
+        f->posread ++;
+    }  
+    return 0;
+}
+
+static int fifo_write(fifo* f, const uint8_t* buf, int buflen){		
+    uint8_t* posread;     
+    uint8_t* nextpos; 
+    int i;       
+	if(!buf || buflen<=0)return 0;	
+    posread = f->posread;    
+    for(i=0; i<buflen; i++){
+        nextpos = f->poswrite;
+        if(nextpos == f->end){
+            nextpos = f->begin;
+        }else{
+            nextpos ++;
+        }        
+        if(nextpos == posread){ //下一个字节 = 读位置，说明已满
+            break;
+        }
+        *f->poswrite = *buf;
+        f->poswrite = nextpos;
+        buf ++;        
+    }
+	return i;
+}
+
+
+static int fifo_read(fifo* f, uint8_t* buf, int buflen){		
+    uint8_t* poswrite;    
+    int i;       
+	if(!buf || buflen<=0)return 0;	
+    poswrite = f->poswrite;    
+    for(i=0; i<buflen; i++){
+        if(f->posread == poswrite){ //当前位置 = 写位置，说明已空
+            break;
+        }        
+        *buf = *f->posread;
+        if(f->posread == f->end){
+            f->posread = f->begin;
+        }else{
+            f->posread ++;
+        } 
+        buf ++;      
+    }
+	return i;
+}
+
 
 //=============== gpio =================
 
@@ -134,6 +244,20 @@ GPIO_TypeDef* gpio_ports_[] = {
 
 //gpio中断回调函数
 static irq_handler gpio_irqs_[16];
+
+//中断处理函数，中断中调用HAL库，HAL库回调此函数
+void HAL_GPIO_EXTI_Callback(uint16_t pin){
+    uint8_t index = 0;    
+    if( pin > 0 ) {
+        while( pin != 0x01 ){
+            pin = pin >> 1;
+            index++;
+        }
+    }
+    if(gpio_irqs_[index]){
+        gpio_irqs_[index]();
+    }
+}
 
 
 int gpio_init_ex(int fd, int mode, int pull, int af){
@@ -187,8 +311,8 @@ void gpio_set_irq(int fd, irq_handler func){
 
 
 
-int gpio_config(int fd, int key, void* value){
-    return 0;
+int gpio_fcntl(int fd, int key, void* value){
+    return -1;
 }
 int gpio_read(int fd, void* buf, int len){
     uint8_t* pbuf = (uint8_t*)buf;
@@ -225,13 +349,52 @@ static USART_TypeDef* uarts_[] = {
 };
 
 
-UART_HandleTypeDef uart_handles_[sizeof(uarts_)/sizeof(void*)];
+#define UART_FIFO_BUFSIZE 512
 
+typedef struct UART_Object{
+    UART_HandleTypeDef handle;
+    int flags; //fd选项
+    fifo txfifo; //发送队列
+    fifo rxfifo; //接收队列
+    uint8_t* buf;    
+    uint8_t rxch;
+    uint8_t txch;
+}UART_Object;
+
+static UART_Object uart_objs_[sizeof(uarts_)/sizeof(void*)];
+
+
+//发送中断
+void HAL_UART_TxCpltCallback(UART_HandleTypeDef* handle){
+    UART_Object* obj = (UART_Object*)handle;
+    int ret = fifo_pop(&obj->txfifo, &obj->txch);
+    if(ret == 0){ //有数据要发
+        HAL_UART_Transmit_IT(handle, &obj->txch, 1);
+    }
+}
+
+//接收中断
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *handle){
+    UART_Object* obj = (UART_Object*)handle;
+    fifo_push(&obj->rxfifo, obj->rxch);
+    HAL_UART_Receive_IT(handle, &obj->rxch, 1);
+}
+
+//出错时恢复接收
+void HAL_UART_ErrorCallback( UART_HandleTypeDef *handle ){
+    UART_Object* obj = (UART_Object*)handle;
+    HAL_UART_Receive_IT(handle, &obj->rxch, 1);
+}
 
 
 static UART_HandleTypeDef* uart_get_handle(int fd){
     int index = UART_FD_GET_INDEX(fd);    
-    return &(uart_handles_[index]);
+    return &(uart_objs_[index].handle);
+}
+
+static UART_Object* uart_get_object(int fd){
+    int index = UART_FD_GET_INDEX(fd);    
+    return &(uart_objs_[index]);
 }
 
 static int uart_get_gpio_af(int index){
@@ -254,7 +417,7 @@ static int uart_get_gpio_af(int index){
 }
 
 
-static int uart_get_flags(int fd){
+static int uart_get_attr(int fd){
     int baud;
     int stopbits;
     int parity;
@@ -275,7 +438,7 @@ static int uart_get_flags(int fd){
     return baud|CS8|parity|stopbits;
 }
 
-int uart_set_flags(int fd, int flags){
+int uart_set_attr(int fd, int flags){
     int baud;
     int stopbits;
     int parity;
@@ -346,35 +509,79 @@ int uart_init(int fd, int tx, int rx, int flags){
     }
     
     gpio_init_ex(tx, GPIO_MODE_AF_PP, GPIO_NOPULL, af);
+#ifdef GPIO_AF7_USART1 //have af
     gpio_init_ex(rx, GPIO_MODE_AF_PP, GPIO_NOPULL, af);
-    
-    return uart_set_flags(fd, flags);    
+#else
+    gpio_init_ex(rx, GPIO_MODE_INPUT, GPIO_NOPULL, af);
+#endif 
+
+    return uart_set_attr(fd, flags);    
 }
 
-int uart_config(int fd, int key, void* value){
-    //struct termios* attr;
-    switch(key){
-        case UART_ATTR_SET:
 
-        case UART_ATTR_GET:
+static int uart_set_flags(int fd, int flags){
+    UART_Object* obj = (UART_Object*)uart_get_handle(fd);    
+    if(flags & O_NONBLOCK){ //非阻塞，分配内存
+        if(!obj->buf){
+            obj->buf = (uint8_t*)malloc(UART_FIFO_BUFSIZE*2);
+            if(!obj->buf){
+                errno = ENOMEM;
+                return -1;
+            }
+        }
+        fifo_init(&obj->txfifo, obj->buf, UART_FIFO_BUFSIZE);
+        fifo_init(&obj->rxfifo, obj->buf + UART_FIFO_BUFSIZE, UART_FIFO_BUFSIZE);
 
-        default:
-            return 0;
+        //开始异步接收
+        HAL_UART_Receive_IT(&obj->handle, &obj->rxch, 1);
     }
+    obj->flags = flags;
     return 0;
 }
 
-
+int uart_fcntl(int fd, int key, void* value){
+    int iv;
+    struct termios* attr;
+    UART_Object* obj = (UART_Object*)uart_get_handle(fd);
+    if(!obj)return -1;
+    switch(key){
+        case F_GETFL: //获取flags
+            *(int*)value = obj->flags;
+            return 0;
+        case F_SETFL: //设置flags
+            iv = (int)(uintptr_t)value;
+            return uart_set_flags(fd, iv);
+        case UART_ATTR_GET: //获取termios属性
+            attr = (struct termios*)value;
+            attr->c_cflag = uart_get_attr(fd);
+            return 0;
+        case UART_ATTR_SET: //设置termios属性
+            attr = (struct termios*)value;            
+            return uart_set_attr(fd, attr->c_cflag);
+        default:
+            break;
+    }
+    return -1;
+}
 
 
 int uart_read(int fd, void* buf, int len){
     int recved = 0;
     int timeout ;
-    UART_HandleTypeDef* uart = uart_get_handle(fd);
+    UART_Object* uart = uart_get_object(fd);
     if(!uart)return -1;
-    timeout = 2000;
+    //非阻塞读取
+    if(uart->flags & O_NONBLOCK){
+        recved = fifo_read(&uart->rxfifo, buf, len);
+        if(recved<=0){
+            errno = EWOULDBLOCK;
+        }        
+        return recved;
+    }
+    //阻塞读取
+    timeout = 3000;
     while(recved < len){
-        if(HAL_OK != HAL_UART_Receive(uart, (uint8_t*)buf + recved, 1, timeout)){
+        if(HAL_OK != HAL_UART_Receive(&uart->handle, (uint8_t*)buf + recved, 1, timeout)){
             return recved;
         }
         recved ++;
@@ -382,15 +589,44 @@ int uart_read(int fd, void* buf, int len){
     }        
     return recved;
 }
+
 int uart_write(int fd, const void* buf, int len){
-    UART_HandleTypeDef* uart = uart_get_handle(fd); 
-    if(!uart)return -1; 
-    if(HAL_OK == HAL_UART_Transmit(uart, (uint8_t*)buf, len, 2000)){
+    int writed;
+    UART_Object* uart = uart_get_object(fd);
+    if(!uart)return -1;
+    //非阻塞写入
+    if(uart->flags & O_NONBLOCK){
+        writed = fifo_write(&uart->txfifo, buf, len);
+        if(writed<=0){
+            errno = EWOULDBLOCK;
+        }
+        //触发发送中断
+        __HAL_UART_ENABLE_IT((&uart->handle), UART_IT_TC);
+        return writed;
+    }    
+    //阻塞写入
+    if(HAL_OK == HAL_UART_Transmit(&uart->handle, (uint8_t*)buf, len, 3000)){
         return len;
     }
     return -1;
 }
 
+//检测是否可读写
+int uart_poll(int fd, int event){
+    int revent = 0;
+    UART_Object* uart = uart_get_object(fd);    
+    if(uart->flags & O_NONBLOCK){
+        if((event & POLLIN) && (!fifo_is_empty(&uart->rxfifo))){            
+            revent |= POLLIN;            
+        }
+        if((event & POLLOUT) && fifo_is_empty(&uart->txfifo)){            
+            revent |= POLLOUT;           
+        }
+    }else{
+        revent = event;        
+    }    
+    return revent;
+}
 
 int _tp_cfsetispeed(struct termios* attr, speed_t t){
     attr->c_cflag &= 0xffff0000;
@@ -403,12 +639,12 @@ int _tp_cfsetospeed(struct termios* attr, speed_t t){
     return 0;    
 }
 int _tp_tcgetattr(int fd, struct termios* attr){
-    int flag = uart_get_flags(fd);
+    int flag = uart_get_attr(fd);
     attr->c_cflag = flag;
     return (flag == 0);
 }
 int _tp_tcsetattr(int fd, int opt, const struct termios* attr){
-    return uart_set_flags(fd, attr->c_cflag);
+    return uart_set_attr(fd, attr->c_cflag);
 }
 //=====================================================
 
@@ -1077,23 +1313,22 @@ finish:
 
 
 //======================== posix api =============================
-typedef int (*read_func)(int fd, void* buf, int sz);
-typedef int (*write_func)(int fd, const void* buf, int sz);
-typedef int (*fcntl_func)(int fd, const void* buf, va_list v);
+
 
 typedef struct file_ops{
     read_func rd;
-    write_func wr;
-    fcntl_func ctl;
+    write_func wr;    
+    fcntl_func fctl;
+    poll_func pl;
 }file_ops;
 
 static file_ops file_ops_[] = {
-    {stdio_read, stdio_write, NULL},
-    {gpio_read,  gpio_write,  NULL},
-    {uart_read,  uart_write,  NULL}, 
-    {spi_read,   spi_write,   NULL}, 
-    {i2c_read,   i2c_write,   NULL}, 
-    {rom_read,   rom_write,  NULL}, 
+    {stdio_read, stdio_write, NULL, NULL},
+    {gpio_read,  gpio_write,  NULL, NULL},
+    {uart_read,  uart_write, uart_fcntl, uart_poll}, 
+    {spi_read,   spi_write,   NULL, NULL}, 
+    {i2c_read,   i2c_write,   NULL, NULL}, 
+    {rom_read,   rom_write,  NULL, NULL}, 
 };
 
 
@@ -1112,6 +1347,33 @@ ssize_t _tp_write(int fd, const void* buf, size_t sz){
 }
 
 
+int _tp_poll(struct _tp_pollfd* fds, unsigned int nfds, int timeout){
+    unsigned int i;
+    int revent,type;
+    int ret = 0;
+    struct _tp_pollfd* pfd;
+    poll_func func;
+    uint32_t start = HAL_GetTick();
+    do{
+        for(i = 0; i<nfds; i++){
+            pfd = &fds[i];
+            type = FD_GET_TYPE(pfd->fd);
+            func = file_ops_[type].pl;
+            if(func){
+                revent = func(pfd->fd, pfd->events);
+            }else{
+                revent = pfd->events;
+            }  
+            pfd->revents = (short)revent;
+            if(revent)ret ++;
+        }
+        if(ret)break;
+        //TODO 进入睡眠模式
+    }while((HAL_GetTick() - start) < timeout);
+    
+    return ret;
+}
+
 int _tp_open(const char* pathname, int flags, ...){
     int fd = System_Open(pathname, flags);
     if(fd>=0)return fd;
@@ -1124,7 +1386,18 @@ int _tp_close(int fd){
 
 
 int _tp_fcntl(int fd, int cmd, ...){
-    return 0;
+    int type = FD_GET_TYPE(fd);
+    va_list ap;
+    void* value;
+    int ret = -1;
+    fcntl_func func = file_ops_[type].fctl;
+    if(func){
+        va_start(ap, cmd);
+        value = va_arg(ap, void*);
+        ret = func(fd, cmd, value);
+        va_end(ap);
+    }    
+    return ret;
 }
 
 
@@ -1159,19 +1432,6 @@ _tp_clock_t _tp_clock(){
 
 
 //============= 各系统中断 ===============
-
-void HAL_GPIO_EXTI_Callback(uint16_t pin){
-    uint8_t index = 0;    
-    if( pin > 0 ) {
-        while( pin != 0x01 ){
-            pin = pin >> 1;
-            index++;
-        }
-    }
-    if(gpio_irqs_[index]){
-        gpio_irqs_[index]();
-    }
-}
 
 void SysTick_Handler(){ 
     HAL_IncTick();
@@ -1209,32 +1469,26 @@ void EXTI15_10_IRQHandler(){
 }
 
 
-
-
-void HAL_UART_ErrorCallback(UART_HandleTypeDef* handle){
-    //HAL_UART_Receive_IT( &UartHandle, &RxData, 1 );
-}
-
 void USART1_IRQHandler(){
-
+    HAL_UART_IRQHandler(&uart_objs_[0].handle);
 }
 #ifdef USART2
 void USART2_IRQHandler(){
-    
+    HAL_UART_IRQHandler(&uart_objs_[1].handle);
 }
 #endif
 #ifdef USART3
 void USART3_IRQHandler(){
-    //HAL_UART_IRQHandler(&uarts_[2]);
+    HAL_UART_IRQHandler(&uart_objs_[2].handle);
 }
 #endif
 #ifdef UART4
 void UART4_IRQHandler(){
-    
+    HAL_UART_IRQHandler(&uart_objs_[3].handle);
 }
 #endif
 #ifdef UART5
 void UART5_IRQHandler(){
-    
+    HAL_UART_IRQHandler(&uart_objs_[4].handle);
 }
 #endif
