@@ -330,17 +330,14 @@ int gpio_fcntl(int fd, int key, void* value){
 int gpio_poll(int fd, int event){
     int ev = 0;
     uint16_t pin;
-    if(event & POLLIN){
-        ev |= POLLIN;
-    }
     if(event & POLLOUT){
         ev |= POLLOUT;
     } 
-    if(event & POLLPRI){
+    if((event & POLLPRI) || (event & POLLIN)){
         pin = GPIO_FD_GET_PIN(fd);
         if(gpio_irq_pins_ & pin){
             gpio_irq_pins_ &= ~pin;
-            ev |= POLLPRI;            
+            ev |= event;            
         }
     }
     return ev;

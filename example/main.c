@@ -11,8 +11,8 @@ extern void example_uart_nb();
 int main(){
     printf("hello world\n");
     //example_led();
-    example_key();
-    //example_key_nb();
+    //example_key();
+    example_key_nb();
     //example_uart();
     //example_uart_nb();
 

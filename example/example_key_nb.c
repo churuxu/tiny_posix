@@ -25,11 +25,11 @@ void example_key_nb(){
     printf("press key to toggle led\n");
 
     fds[0].fd = btnfd_;
-    fds[0].events = POLLPRI;
+    fds[0].events = POLLIN;
     while(1){
         ret = poll(fds, 1, 5000);
         if(ret>0){
-            if(fds[0].revents & POLLPRI){
+            if(fds[0].revents & POLLIN){
                 v = 0;
                 read(btnfd_, &v, 1);
                 write(ledfd_, &v, 1);
