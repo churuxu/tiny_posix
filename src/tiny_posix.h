@@ -207,8 +207,6 @@ int open(const char* pathname, int flags, ...);
 int fcntl(int fd, int cmd, ...);
 off_t lseek(int fd, off_t offset, int where);
 
-//========== pipe ===========
-int pipe(int outfd[2]);
 
 //========== socket ===========
 int socket(int af, int type, int proto);

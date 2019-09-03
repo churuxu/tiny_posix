@@ -5,7 +5,7 @@
 #define LED3 GPIO_FD_REVERSE(PORTA, 12)
 #define LED4 GPIO_FD_REVERSE(PORTA, 11)
 
-#define KEY1 GPIO_FD(PORTB, 4)
+#define KEY1 GPIO_FD(PORTA, 0)
 
 #define SERIAL1 UART_FD(1)
 #define SERIAL2 UART_FD(2)
@@ -23,7 +23,8 @@ int System_Open(const char* name, int flags){
     MOUNT_FD("/leds/led2", LED2);
     MOUNT_FD("/leds/led3", LED3);
     MOUNT_FD("/leds/led4", LED4);
-    
+
+    MOUNT_FD("/keys/key0", KEY1);
     return -1;
 }
 
@@ -37,7 +38,7 @@ void System_Config(){
     gpio_init(LED3, GPIO_MODE_OUTPUT_PP, GPIO_NOPULL);
     gpio_init(LED4, GPIO_MODE_OUTPUT_PP, GPIO_NOPULL);
 
-    //gpio_init(KEY1, GPIO_MODE_IT_RISING, 0);
+    gpio_init(KEY1, GPIO_MODE_IT_RISING_FALLING, 0);
 
     //uart_init(SERIAL1, UART1_DEFAULT_PINS, B115200|CS8);
     //uart_init(SERIAL2, UART3_DEFAULT_PINS, B115200|CS8);

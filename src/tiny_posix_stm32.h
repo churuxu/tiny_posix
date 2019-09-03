@@ -121,6 +121,8 @@ void gpio_set_irq(int fd, irq_handler func);
 //read/write 函数
 int gpio_read(int fd, void* buf, int len);
 int gpio_write(int fd, const void* buf, int len);
+int gpio_fcntl(int fd, int key, void* value);
+int gpio_poll(int fd, int event);
 
 //gpio 操作
 #define gpio_status(fd)  ((0 == GPIO_FD_IS_REVERSE(fd)) == HAL_GPIO_ReadPin(GPIO_FD_GET_PORT(fd), GPIO_FD_GET_PIN(fd)))

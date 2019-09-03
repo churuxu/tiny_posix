@@ -244,10 +244,13 @@ GPIO_TypeDef* gpio_ports_[] = {
 
 //gpio中断回调函数
 static irq_handler gpio_irqs_[16];
+//gpio中断的pin
+static uint16_t gpio_irq_pins_;
 
 //中断处理函数，中断中调用HAL库，HAL库回调此函数
 void HAL_GPIO_EXTI_Callback(uint16_t pin){
-    uint8_t index = 0;    
+    uint8_t index = 0;
+    gpio_irq_pins_ |= pin;
     if( pin > 0 ) {
         while( pin != 0x01 ){
             pin = pin >> 1;
@@ -271,6 +274,15 @@ int gpio_init_ex(int fd, int mode, int pull, int af){
 #endif
     HAL_GPIO_Init(GPIO_FD_GET_PORT(fd), &GPIO_InitStruct);   
     gpio_reset(fd);
+    switch(mode){
+        case GPIO_MODE_IT_RISING:
+        case GPIO_MODE_IT_FALLING:
+        case GPIO_MODE_IT_RISING_FALLING:
+            gpio_set_irq(fd, NULL);
+        default:
+            break;
+    }
+    
     return 0;    
 }
 
@@ -314,6 +326,26 @@ void gpio_set_irq(int fd, irq_handler func){
 int gpio_fcntl(int fd, int key, void* value){
     return -1;
 }
+
+int gpio_poll(int fd, int event){
+    int ev = 0;
+    uint16_t pin;
+    if(event & POLLIN){
+        ev |= POLLIN;
+    }
+    if(event & POLLOUT){
+        ev |= POLLOUT;
+    } 
+    if(event & POLLPRI){
+        pin = GPIO_FD_GET_PIN(fd);
+        if(gpio_irq_pins_ & pin){
+            gpio_irq_pins_ &= ~pin;
+            ev |= POLLPRI;            
+        }
+    }
+    return ev;
+}
+
 int gpio_read(int fd, void* buf, int len){
     uint8_t* pbuf = (uint8_t*)buf;
     int val = gpio_status(fd);
@@ -1324,8 +1356,8 @@ typedef struct file_ops{
 
 static file_ops file_ops_[] = {
     {stdio_read, stdio_write, NULL, NULL},
-    {gpio_read,  gpio_write,  NULL, NULL},
-    {uart_read,  uart_write, uart_fcntl, uart_poll}, 
+    {gpio_read,  gpio_write,  gpio_fcntl, gpio_poll},
+    {uart_read,  uart_write,  uart_fcntl, uart_poll}, 
     {spi_read,   spi_write,   NULL, NULL}, 
     {i2c_read,   i2c_write,   NULL, NULL}, 
     {rom_read,   rom_write,  NULL, NULL}, 

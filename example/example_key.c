@@ -26,6 +26,7 @@ void example_key(){
     }
 
     gpio_set_irq(btnfd_, on_key);
+    //signal(SIGIO, on_key);
     printf("press key to toggle led\n");
 
     while(1){
