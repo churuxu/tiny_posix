@@ -14,8 +14,6 @@ set(HEADER_EXTS *.h *.hpp)
 list(APPEND EXCLUDES ".*/config/.*")
 
 set(FLAGS )
-set(CFLAGS ${FLAGS})
-set(CXXFLAGS ${FLAGS})
 
 set(LDFLAGS "")
 
@@ -53,6 +51,11 @@ endif()
 if(NOT DEFINED TEST_FILTER)
 	set(TEST_FILTER ".*test.*\..*")
 endif()
+if(NOT DEFINED BUILD_TEST)
+	set(BUILD_TEST 1)
+endif()
+set(CFLAGS ${FLAGS})
+set(CXXFLAGS ${FLAGS})
 
 project(${PROJECT_NAME})
 
@@ -194,7 +197,7 @@ endif()
 
 #-------------------- build unit test --------------------
 set(TEST_TARGET_NAME ${PROJECT_NAME}-test)
-if(${HAS_TEST})
+if(${HAS_TEST} AND ${BUILD_TEST})
 	add_executable(${TEST_TARGET_NAME} ${TEST_SRCS})
 	if(${HAS_LIB})
 		target_link_libraries(${TEST_TARGET_NAME} ${LIB_TARGET_NAME} ${CONAN_LIBS})
