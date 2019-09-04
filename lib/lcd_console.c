@@ -1,6 +1,6 @@
 #include "lcd_console.h"
 
-#ifdef HAVE_LCD
+#ifdef LCD_DRIVER_ID
 
 #include "lcd.h"
 

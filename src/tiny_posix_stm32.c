@@ -1,4 +1,7 @@
 #include "tiny_posix.h"
+
+#ifdef STM32
+
 #include "system_config.h"
 
 #include <stdarg.h>
@@ -1521,3 +1524,7 @@ void UART5_IRQHandler(){
     HAL_UART_IRQHandler(&uart_objs_[4].handle);
 }
 #endif
+
+
+
+#endif //#ifdef STM32

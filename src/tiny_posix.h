@@ -32,6 +32,15 @@ http://pubs.opengroup.org/onlinepubs/9699919799/
 #include <signal.h> 
 #include <time.h> 
 
+//generic posix headers
+#if defined(__linux__)
+#include <unistd.h> //open close read write
+#include <poll.h>  //poll
+#include <fcntl.h> //fcntl
+#include <termios.h> 
+#include <sys/socket.h> 
+#endif
+
 #ifdef STM32
 #include "tiny_posix_stm32.h"
 #endif
@@ -41,6 +50,7 @@ http://pubs.opengroup.org/onlinepubs/9699919799/
 extern "C" {
 #endif
 
+#if !defined(__linux__)
 
 //============== types ===============
 
@@ -259,7 +269,7 @@ int tcsetattr(int fd, int opt, const struct termios* attr);
 
 
 
-
+#endif //defined(__linux__)
 
 #ifdef __cplusplus
 }

@@ -25,8 +25,11 @@ void example_key(){
         printf("open key error\n");
     }
 
+#ifdef STM32
     gpio_set_irq(btnfd_, on_key);
+#endif
     //signal(SIGIO, on_key);
+
     printf("press key to toggle led\n");
 
     while(1){

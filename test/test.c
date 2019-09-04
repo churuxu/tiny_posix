@@ -5,7 +5,7 @@
 在不修改此文件的情况下，
 使用自定义API头文件，能编译通过，则说明自定义API头文件OK
 */
-
+#include <stdint.h>
 #include <stdlib.h> //内存/字符串等
 #include <string.h> //内存/字符串等
 #include <assert.h> //assert
@@ -25,8 +25,7 @@
 int test_file_stdc(){
     int ret;
     char buf[16];
-    FILE* f;
-    int e;
+    FILE* f;    
    
     //错误码测试
     f = fopen("a.txt", "rb");
@@ -35,7 +34,7 @@ int test_file_stdc(){
 
     //写文件测试
     f = fopen("b.txt","wb");
-    e = errno;
+    
     assert(f != NULL);
     ret = fwrite("hello", 1, 5, f);
     assert(ret == 5);

@@ -1,4 +1,6 @@
-﻿#include "lcd.h"
+﻿#if defined(LCD_DRIVER_ID) && LCD_DRIVER_ID == 9341
+
+#include "lcd.h"
 #include "cfont.h"
 #include "tiny_posix.h"
 
@@ -820,3 +822,6 @@ void LCD_DisplayNum_color(u16 x,u16 y,u32 num,u8 len,u8 size,u8 mode,u16 brushco
 	BRUSH_COLOR=bh_color;   //不改变系统颜色
 	BACK_COLOR=bk_color;
 }
+
+#endif
+
