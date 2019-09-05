@@ -13,10 +13,10 @@
 #endif
 
 
-#define _tp_open _open 
-#define _tp_close _close
-#define _tp_read _read
-#define _tp_write _write
+#define posix_open _open 
+#define posix_close _close
+#define posix_read _read
+#define posix_write _write
 
 #ifdef __cplusplus
 extern "C" {

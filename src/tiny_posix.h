@@ -5,6 +5,16 @@
 user layer:
 http://pubs.opengroup.org/onlinepubs/9699919799/
 
+
+功能：
+文件
+Socket
+串口
+目录
+时钟
+事件
+动态库
+
 */
 
 
@@ -45,6 +55,9 @@ http://pubs.opengroup.org/onlinepubs/9699919799/
 #include "tiny_posix_stm32.h"
 #endif
 
+#ifdef _WIN32
+#include "tiny_posix_win32.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -54,28 +67,28 @@ extern "C" {
 
 //============== types ===============
 
-typedef int _tp_ssize_t;
-typedef uint16_t _tp_speed_t;
-typedef uint64_t _tp_off_t;
+typedef int posix_ssize_t;
+typedef uint16_t posix_speed_t;
+typedef uint64_t posix_off_t;
 #if __SIZE_OF_POINTER__ == 64 
-typedef uint64_t _tp_clock_t;
+typedef uint64_t posix_clock_t;
 #else
-typedef uint32_t _tp_clock_t;
+typedef uint32_t posix_clock_t;
 #endif
-typedef uint64_t _tp_time_t;
-typedef int _tp_socklen_t;
-typedef struct _tp_DIR _tp_DIR;
-struct _tp_timeval{
-    _tp_time_t tv_sec;
+typedef uint64_t posix_time_t;
+typedef int posix_socklen_t;
+typedef struct posix_DIR posix_DIR;
+struct posix_timeval{
+    posix_time_t tv_sec;
     long tv_usec;
 };
 
-struct _tp_timezone{
+struct posix_timezone{
     int tz_minuteswest;
     int tz_dsttime;
 };
 
-struct _tp_pollfd {
+struct posix_pollfd {
     int fd;
     short events;     
     short revents;
@@ -83,21 +96,21 @@ struct _tp_pollfd {
 
 
 
-struct _tp_sockaddr{
+struct posix_sockaddr{
     unsigned short sa_family;
     char sa_data[14];
 };
 
-struct _tp_stat{
+struct posix_stat{
     unsigned short sa_family;
     char sa_data[14];
 };
 
-struct _tp_termios{
+struct posix_termios{
     uint32_t c_cflag;
 };
 
-struct _tp_utimbuf{
+struct posix_utimbuf{
     unsigned short sa_family;
     char sa_data[14];
 };
@@ -168,45 +181,46 @@ struct _tp_utimbuf{
 
 
 //============== renames ===============
-#define off_t _tp_off_t
-#define time_t _tp_time_t
-#define clock_t _tp_clock_t
-#define pollfd _tp_pollfd
-#define timeval _tp_timeval
-#define timezone _tp_timezone
-#define socklen_t _tp_socklen_t
-#define DIR _tp_DIR
-#define speed_t _tp_speed_t
-#define sockaddr _tp_sockaddr
-#define stat _tp_stat
-#define termios _tp_termios
-#define utimbuf _tp_utimbuf
+#ifndef TINY_POSIX_IMPL
+#define off_t posix_off_t
+#define time_t posix_time_t
+#define clock_t posix_clock_t
+#define pollfd posix_pollfd
+#define timeval posix_timeval
+#define timezone posix_timezone
+#define socklen_t posix_socklen_t
+#define DIR posix_DIR
+#define speed_t posix_speed_t
+#define sockaddr posix_sockaddr
+#define stat posix_stat
+#define termios posix_termios
+#define utimbuf posix_utimbuf
 
-#define open _tp_open
-#define close _tp_close
-#define poll _tp_poll
-#define read _tp_read
-#define write _tp_write
-#define fcntl _tp_fcntl
-#define lseek _tp_lseek
+#define open posix_open
+#define close posix_close
+#define poll posix_poll
+#define read posix_read
+#define write posix_write
+#define fcntl posix_fcntl
+#define lseek posix_lseek
 
-#define socket _tp_socket
-#define connect _tp_connect
-#define listen _tp_listen
-#define accept _tp_accept
-#define bind _tp_bind
-#define sendto _tp_sendto
-#define recvfrom _tp_recvfrom
-#define recv _tp_recv
-#define send _tp_send
+#define socket posix_socket
+#define connect posix_connect
+#define listen posix_listen
+#define accept posix_accept
+#define bind posix_bind
+#define sendto posix_sendto
+#define recvfrom posix_recvfrom
+#define recv posix_recv
+#define send posix_send
 
-#define clock _tp_clock
-#define gettimeofday _tp_gettimeofday
-#define settimeofday _tp_settimeofday
+#define clock posix_clock
+#define gettimeofday posix_gettimeofday
+#define settimeofday posix_settimeofday
 
-#define sleep _tp_sleep
-#define usleep _tp_usleep
-
+#define sleep posix_sleep
+#define usleep posix_usleep
+#endif
 
 //============== generic ===============
 ssize_t read(int fd, void * buf, size_t count);
@@ -228,19 +242,6 @@ ssize_t recv(int fd, void* buf, size_t count, int flags);
 ssize_t send(int fd, const void* buf, size_t count, int flags);
 ssize_t recvfrom(int fd, void* buf, size_t buflen, int flags, struct sockaddr* addrbuf, socklen_t* addrlen);
 ssize_t sendto(int fd, const void* buf, size_t buflen, int flags, const struct sockaddr* addr, socklen_t addrlen);
-
-
-//=========== file system ==============
-int stat(const char* filename, struct stat* out);
-int mkdir(const char* path, mode_t mode);
-int rmdir(const char* path);
-int unlink(const char* filename);
-int utime(const char* filename, const struct utimbuf* out);
-int access(const char* filename, int mode);
-
-DIR* opendir(const char* name);
-int closedir(DIR* d);
-struct dirent* readdir(DIR* d);
 
 
 //========== date time ===========

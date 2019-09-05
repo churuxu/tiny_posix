@@ -38,7 +38,7 @@ int stdio_read(int fd, void* buf, int len){
         return stdin_func_(fd, buf, len);
     }
     if(fd == STDIN_FILENO && stdio_fds_[0]){
-        return _tp_read(stdio_fds_[0], buf, len);
+        return posix_read(stdio_fds_[0], buf, len);
     }
     return -1;
 }
@@ -50,7 +50,7 @@ int stdio_write(int fd, const void* buf, int len){
             return stdout_func_(fd, buf, len);
         }
         if(stdio_fds_[1]){
-            return _tp_write(stdio_fds_[1], buf, len);
+            return posix_write(stdio_fds_[1], buf, len);
         }
     }
     if(fd == STDERR_FILENO){
@@ -58,7 +58,7 @@ int stdio_write(int fd, const void* buf, int len){
             return stderr_func_(fd, buf, len);
         }
         if(stdio_fds_[1]){
-            return _tp_write(stdio_fds_[2], buf, len);
+            return posix_write(stdio_fds_[2], buf, len);
         }
     }
     return -1;
@@ -660,22 +660,22 @@ int uart_poll(int fd, int event){
     return revent;
 }
 
-int _tp_cfsetispeed(struct termios* attr, speed_t t){
+int posix_cfsetispeed(struct termios* attr, speed_t t){
     attr->c_cflag &= 0xffff0000;
     attr->c_cflag |= t;
     return 0;
 }
-int _tp_cfsetospeed(struct termios* attr, speed_t t){
+int posix_cfsetospeed(struct termios* attr, speed_t t){
     attr->c_cflag &= 0xffff0000;
     attr->c_cflag |= t;
     return 0;    
 }
-int _tp_tcgetattr(int fd, struct termios* attr){
+int posix_tcgetattr(int fd, struct termios* attr){
     int flag = uart_get_attr(fd);
     attr->c_cflag = flag;
     return (flag == 0);
 }
-int _tp_tcsetattr(int fd, int opt, const struct termios* attr){
+int posix_tcsetattr(int fd, int opt, const struct termios* attr){
     return uart_set_attr(fd, attr->c_cflag);
 }
 //=====================================================
@@ -1364,14 +1364,14 @@ static file_ops file_ops_[] = {
 };
 
 
-ssize_t _tp_read(int fd, void* buf, size_t sz){
+ssize_t posix_read(int fd, void* buf, size_t sz){
     int type = FD_GET_TYPE(fd);
     read_func func = file_ops_[type].rd;
     if(func)return func(fd, buf, sz);
     return -1;
 }
 
-ssize_t _tp_write(int fd, const void* buf, size_t sz){
+ssize_t posix_write(int fd, const void* buf, size_t sz){
     int type = FD_GET_TYPE(fd);
     write_func func = file_ops_[type].wr;
     if(func)return func(fd, buf, sz);
@@ -1379,11 +1379,11 @@ ssize_t _tp_write(int fd, const void* buf, size_t sz){
 }
 
 
-int _tp_poll(struct _tp_pollfd* fds, unsigned int nfds, int timeout){
+int posix_poll(struct posix_pollfd* fds, unsigned int nfds, int timeout){
     unsigned int i;
     int revent,type;
     int ret = 0;
-    struct _tp_pollfd* pfd;
+    struct posix_pollfd* pfd;
     poll_func func;
     uint32_t start = HAL_GetTick();
     do{
@@ -1406,18 +1406,18 @@ int _tp_poll(struct _tp_pollfd* fds, unsigned int nfds, int timeout){
     return ret;
 }
 
-int _tp_open(const char* pathname, int flags, ...){
+int posix_open(const char* pathname, int flags, ...){
     int fd = System_Open(pathname, flags);
     if(fd>=0)return fd;
     return -1;
 }
 
-int _tp_close(int fd){
+int posix_close(int fd){
     return 0;
 }
 
 
-int _tp_fcntl(int fd, int cmd, ...){
+int posix_fcntl(int fd, int cmd, ...){
     int type = FD_GET_TYPE(fd);
     va_list ap;
     void* value;
@@ -1435,11 +1435,11 @@ int _tp_fcntl(int fd, int cmd, ...){
 
 
 
-unsigned int _tp_sleep(unsigned int seconds){
+unsigned int posix_sleep(unsigned int seconds){
     HAL_Delay(seconds * 1000);
     return 0;
 }
-unsigned int _tp_usleep(unsigned int micro_seconds){
+unsigned int posix_usleep(unsigned int micro_seconds){
    //HAL_Delay(micro_seconds / 1000);
     int ms = micro_seconds / 1000;
     if(ms){
@@ -1453,7 +1453,7 @@ unsigned int _tp_usleep(unsigned int micro_seconds){
     return micro_seconds;
 }
 
-_tp_clock_t _tp_clock(){
+posix_clock_t posix_clock(){
     return HAL_GetTick();
 }
 
