@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 /*
 
@@ -17,20 +17,14 @@ Socket
 
 */
 
+#define _FILE_OFFSET_BITS 64  //支持4G以上文件
 
-//win32 headers
-#ifdef _WIN32
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#include <windows.h>
-#include <io.h>
-#include <fcntl.h>
+#ifdef STM32
+#include "tiny_posix_stm32.h"
 #endif
 
-//headers
-#ifdef __GNUC__
-#include <fcntl.h> 
-#include <unistd.h> 
+#ifdef _WIN32
+#include "tiny_posix_win32.h"
 #endif
 
 //stdc headers
@@ -42,6 +36,8 @@ Socket
 #include <signal.h> 
 #include <time.h> 
 
+#include <sys/types.h> 
+
 //generic posix headers
 #if defined(__linux__)
 #include <unistd.h> //open close read write
@@ -51,13 +47,6 @@ Socket
 #include <sys/socket.h> 
 #endif
 
-#ifdef STM32
-#include "tiny_posix_stm32.h"
-#endif
-
-#ifdef _WIN32
-#include "tiny_posix_win32.h"
-#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -67,8 +56,7 @@ extern "C" {
 
 //============== types ===============
 
-typedef int posix_ssize_t;
-typedef uint16_t posix_speed_t;
+
 typedef uint64_t posix_off_t;
 #if __SIZE_OF_POINTER__ == 64 
 typedef uint64_t posix_clock_t;
@@ -88,13 +76,6 @@ struct posix_timezone{
     int tz_dsttime;
 };
 
-struct posix_pollfd {
-    int fd;
-    short events;     
-    short revents;
-};
-
-
 
 struct posix_sockaddr{
     unsigned short sa_family;
@@ -106,25 +87,27 @@ struct posix_stat{
     char sa_data[14];
 };
 
-struct posix_termios{
-    uint32_t c_cflag;
-};
+
 
 struct posix_utimbuf{
     unsigned short sa_family;
     char sa_data[14];
 };
-//============== defines ===============
 
-//for access()
-#ifndef F_OK
-#define F_OK  1 
-#define R_OK  2 
-#define W_OK  4 
-#define X_OK  8 
+
+
+
+//============== generic ===============
+
+#ifndef F_GETFL
+#define F_GETFL 0
+#define F_SETFL 1
 #endif
 
-//for poll()
+#ifndef O_NONBLOCK
+#define O_NONBLOCK 0x00010000
+#endif
+
 #ifndef POLLIN
 #define POLLIN  1 //有数据可读时触发
 #define POLLOUT 2 //网络连接上时触发
@@ -133,17 +116,60 @@ struct posix_utimbuf{
 #define POLLPRI 16 //高优先数据到来
 #endif
 
-#ifndef F_GETFL
-#define F_GETFL 0
-#define F_SETFL 1
+
+#ifndef USE_SYSTEM_POLLFD
+struct pollfd {
+    int fd;
+    short events;     
+    short revents;
+};
 #endif
 
-#ifndef O_NONBLOCK
-#define O_NONBLOCK 0xf0
+int posix_open(const char* pathname, int flags, ...);
+int posix_close(int fd);
+int posix_fcntl(int fd, int cmd, ...);
+ssize_t posix_read(int fd, void * buf, size_t count);
+ssize_t posix_write(int fd, const void* buf, size_t count);
+off_t posix_lseek(int fd, off_t offset, int where);
+int posix_poll(struct pollfd* fds, unsigned int nfds, int timeout);
+
+
+
+//========== socket ===========
+int posix_socket(int af, int type, int proto);
+int posix_connect(int fd, const struct sockaddr* addr, socklen_t addrlen);
+int posix_accept(int fd, struct sockaddr* addrbuf, socklen_t* addrlen);
+int posix_bind(int fd, const struct sockaddr* addr, socklen_t addrlen);
+int posix_listen(int fd, int cap);
+ssize_t posix_recv(int fd, void* buf, size_t count, int flags);
+ssize_t posix_send(int fd, const void* buf, size_t count, int flags);
+ssize_t posix_recvfrom(int fd, void* buf, size_t buflen, int flags, struct sockaddr* addrbuf, socklen_t* addrlen);
+ssize_t posix_sendto(int fd, const void* buf, size_t buflen, int flags, const struct sockaddr* addr, socklen_t addrlen);
+
+#ifndef USE_SYSTEM_GETADDRINFO
+int posix_getaddrinfo(const char* host, const char* port, const struct addrinfo* hint, struct addrinfo* ai);
+void posix_freeaddrinfo(struct addrinfo* ai);
 #endif
 
-#undef EWOULDBLOCK
-#define EWOULDBLOCK EAGAIN
+//============ sys =============
+#ifndef USE_SYSTEM_CLOCK
+clock_t posix_clock(void);
+#endif
+
+int posix_gettimeofday(struct timeval* tv, struct timezone* tz);
+int posix_settimeofday(const struct timeval* tv, const struct timezone* tz);
+
+unsigned int posix_sleep(unsigned int seconds);
+unsigned int posix_usleep(unsigned int micro_seconds);
+
+
+//========== dlfcn ===========
+void* posix_dlopen(const char* name, int flags);
+int posix_dlclose(void* handle);
+void* posix_dlsym(void* handle, const char* funcname);
+
+
+
 
 //============== 串口 ================
 
@@ -179,22 +205,21 @@ struct posix_utimbuf{
 #define TCSAFLUSH 2
 
 
+typedef int speed_t;
+
+struct termios{
+    uint32_t c_cflag;
+};
+
+int posix_cfsetispeed(struct termios* attr, speed_t t);
+int posix_cfsetospeed(struct termios* attr, speed_t t);
+int posix_tcgetattr(int fd, struct termios* attr);
+int posix_tcsetattr(int fd, int opt, const struct termios* attr);
+
+
 
 //============== renames ===============
 #ifndef TINY_POSIX_IMPL
-#define off_t posix_off_t
-#define time_t posix_time_t
-#define clock_t posix_clock_t
-#define pollfd posix_pollfd
-#define timeval posix_timeval
-#define timezone posix_timezone
-#define socklen_t posix_socklen_t
-#define DIR posix_DIR
-#define speed_t posix_speed_t
-#define sockaddr posix_sockaddr
-#define stat posix_stat
-#define termios posix_termios
-#define utimbuf posix_utimbuf
 
 #define open posix_open
 #define close posix_close
@@ -221,54 +246,6 @@ struct posix_utimbuf{
 #define sleep posix_sleep
 #define usleep posix_usleep
 #endif
-
-//============== generic ===============
-ssize_t read(int fd, void * buf, size_t count);
-ssize_t write(int fd, const void* buf, size_t count);
-int poll(struct pollfd* fds, unsigned int nfds, int timeout);
-int close(int fd);
-int open(const char* pathname, int flags, ...);
-int fcntl(int fd, int cmd, ...);
-off_t lseek(int fd, off_t offset, int where);
-
-
-//========== socket ===========
-int socket(int af, int type, int proto);
-int connect(int fd, const struct sockaddr* addr, socklen_t addrlen);
-int accept(int fd, struct sockaddr* addrbuf, socklen_t* addrlen);
-int bind(int fd, const struct sockaddr* addr, socklen_t addrlen);
-int listen(int fd, int cap);
-ssize_t recv(int fd, void* buf, size_t count, int flags);
-ssize_t send(int fd, const void* buf, size_t count, int flags);
-ssize_t recvfrom(int fd, void* buf, size_t buflen, int flags, struct sockaddr* addrbuf, socklen_t* addrlen);
-ssize_t sendto(int fd, const void* buf, size_t buflen, int flags, const struct sockaddr* addr, socklen_t addrlen);
-
-
-//========== date time ===========
-clock_t clock(void);
-int gettimeofday(struct timeval* tv, struct timezone* tz);
-int settimeofday(const struct timeval* tv, const struct timezone* tz);
-
-
-//========== sys ===========
-unsigned int sleep(unsigned int seconds);
-unsigned int usleep(unsigned int micro_seconds);
-
-
-//========== dlfcn ===========
-void* dlopen(const char* name, int flags);
-int dlclose(void* handle);
-void* dlsym(void* handle, const char* funcname);
-
-
-//======= serial port ============
-int cfsetispeed(struct termios* attr, speed_t t);
-int cfsetospeed(struct termios* attr, speed_t t);
-int tcgetattr(int fd, struct termios* attr);
-int tcsetattr(int fd, int opt, const struct termios* attr);
-
-
-
 
 #endif //defined(__linux__)
 

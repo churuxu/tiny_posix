@@ -1,85 +1,34 @@
 ﻿#ifdef _WIN32
 
+#define TINY_POSIX_IMPL
+#include "tiny_posix.h"
+
+
 #include <memory>
 #include <unordered_map>
 
-#include "tiny_posix.h"
-/*
-class FDDriver{
+
+static void SetErrnoFromWSA(){
+    int err = 0;
+    int wsaerr = WSAGetLastError();
+    switch (wsaerr){
+        case WSAEWOULDBLOCK: err = EWOULDBLOCK;break;
+        case WSATRY_AGAIN: err = EAGAIN;break;
+        default:break;
+    }
+    if(err)errno = err;
+}
+
+
+class Win32WSAStarter{
 public:
-    virtual VOID Close(HANDLE file)=0;
-    virtual DWORD Read(HANDLE file, PVOID buf, DWORD buflen, LPOVERLAPPED op)=0;
-    virtual DWORD Write(HANDLE file, const PVOID buf, DWORD buflen, LPOVERLAPPED op)=0;
-    virtual BOOL GetResult(HANDLE file, LPOVERLAPPED op, LPDWORD len)=0;
-};
-
-class FileDriver : public FDDriver{
-public:
-    virtual VOID Close(HANDLE file){
-        CloseHandle(file);
-    }
-
-    virtual DWORD Read(HANDLE file, PVOID buf, DWORD buflen, LPOVERLAPPED op){
-        return ReadFile(file, buf, buflen, NULL, op);
-    }
-
-    virtual DWORD Write(HANDLE file, const PVOID buf, DWORD buflen, LPOVERLAPPED op){
-        return WriteFile(file, buf, buflen, NULL, op);
-    }
-
-    virtual BOOL GetResult(HANDLE file, LPOVERLAPPED op, LPDWORD len){
-        return GetOverlappedResult(file, op, len, FALSE);
+    Win32WSAStarter(){
+        WSADATA wsa;
+        WSAStartup(MAKEWORD(2,2),&wsa);        
     }
 };
+Win32WSAStarter _win32_wsa_starter_;
 
-class SocketDriver : public FDDriver{
-public:    
-    virtual VOID Close(HANDLE file){
-        closesocket(file);
-    }
-    virtual BOOL GetResult(HANDLE file, LPOVERLAPPED op, LPDWORD len){
-        return WSAGetOverlappedResult(file, op, len, FALSE);
-    }
-    virtual DWORD Read(HANDLE file, PVOID buf, DWORD buflen, LPOVERLAPPED op){
-        return -1;
-    }
-    virtual DWORD Write(HANDLE file, const PVOID buf, DWORD buflen, LPOVERLAPPED op){
-        return -1;
-    }
-};
-
-class TCPClientDriver : public SocketDriver{
-public: 
-    virtual BOOL Open(HANDLE file, PVOID addr, DWORD addrlen){
-        
-    }
-
-    virtual DWORD Read(HANDLE file, PVOID buf, DWORD buflen, LPOVERLAPPED op){
-        return WSARecv(file, buf, buflen, NULL, op, NULL);
-    }
-    virtual DWORD Write(HANDLE file, const PVOID buf, DWORD buflen, LPOVERLAPPED op){
-        return WSASend(file, buf, buflen, NULL, op, NULL);
-    }    
-};
-class TCPServerDriver : public SocketDriver{
-public: 
-    virtual DWORD Read(HANDLE file, PVOID buf, DWORD buflen, LPOVERLAPPED op){
-        return WSARecv(file, buf, buflen, NULL, op, NULL);
-    }
-    virtual DWORD Write(HANDLE file, const PVOID buf, DWORD buflen, LPOVERLAPPED op){
-        return WSASend(file, buf, buflen, NULL, op, NULL);
-    }    
-};
-class UDPSocketDriver : public SocketDriver{
-public: 
-    virtual DWORD Read(HANDLE file, PVOID buf, DWORD buflen, LPOVERLAPPED op){
-        return WSARecv(file, buf, buflen, NULL, op, NULL);
-    }
-    virtual DWORD Write(HANDLE file, const PVOID buf, DWORD buflen, LPOVERLAPPED op){
-        return WSASend(file, buf, buflen, NULL, op, NULL);
-    }    
-};
-*/
 
 class FileDescriptor{
 public:
@@ -99,7 +48,7 @@ public:
     virtual short PrePoll(short event) = 0;
 
     //事件等待后，调用这个
-    virtual void PostPoll() = 0;
+    virtual short PostPoll(short event) = 0;
 
     //获取event handle，用以等待事件发生
     virtual HANDLE GetEvent() = 0;
@@ -110,7 +59,7 @@ public:
 
 
 //常规文件
-class GenericFileDescriptor{
+class GenericFileDescriptor:public FileDescriptor{
 public:
     GenericFileDescriptor(HANDLE file){
 
@@ -125,7 +74,7 @@ public:
         return file_;
     }
     size_t Read(void* buf, size_t len){
-        if(nonblock_){
+        if(flags_ & O_NONBLOCK){
             if(readed_){ //非阻塞，已读到结果
                 if(readed_ > len){
                     memcpy(buf, buf_, len);
@@ -138,12 +87,12 @@ public:
                 } 
                 return len;             
             }else{ //非阻塞，未读到结果
-                BOOL ret = ReadFile(file_, buf_, buflen_, NULL, &op_);
+                ReadFile(file_, buf_, buflen_, NULL, &op_);
                 return -1;
             }
         }else{ //阻塞方式读
             DWORD rdlen = 0;
-            BOOL bret = ReadFile(file_, buf, len, &rdlen, NULL);
+            ReadFile(file_, buf, len, &rdlen, NULL);
             return rdlen;
         }
     }
@@ -151,7 +100,7 @@ public:
     size_t Write(const void* buf, size_t len){
         //任何时候都是阻塞方式写
         DWORD wrlen = 0;
-        BOOL bret = WriteFile(file_, buf, len, &wrlen, NULL);
+        WriteFile(file_, buf, len, &wrlen, NULL);
         return wrlen;
     }
 
@@ -159,22 +108,29 @@ public:
         CloseHandle(file_);
     }
     virtual int Control(int cmd, void* val){
+        if(cmd == F_GETFL){
+            return flags_;
+        }
+
         return -1;
     }
     virtual off_t Seek(off_t pos, int where){
         return -1;
     }
 
-    virtual short PrePoll(short event, HANDLE* outhandle){
-        if(!nonblock_)return event;
+    virtual short PrePoll(short event){
+        if(!(flags_ & O_NONBLOCK))return event;
         if(readed_)return POLLIN;
-        if(event & POLLOUT)return POLLOUT;
-        *outhandle = op_.hEvent;
         return 0;
     }
     
-    virtual void PostPoll(){        
+    virtual short PostPoll(short event){        
         BOOL bret = GetOverlappedResult(file_, &op_, &readed_, FALSE);
+        if(!bret){
+            error_ = GetLastError();
+            revent_ = POLLERR;
+        }
+        return 0;
     }  
 
 private:    
@@ -183,78 +139,302 @@ private:
     CHAR* buf_;
     DWORD buflen_;
     DWORD readed_;
-    bool nonblock_;
+    int error_;
+    short event_;
+    short revent_;    
+    int flags_;
 };
 
-class SocketFileDescriptor{
+class SocketFileDescriptor:public FileDescriptor{
 public:
     SocketFileDescriptor(SOCKET sock){
-
+        hevent_ = CreateEvent(NULL,FALSE,FALSE,NULL);
+        sock_ = sock;
     }
     ~SocketFileDescriptor(){
-        
+        if(hevent_)CloseHandle(hevent_);
+        closesocket(sock_);        
     }
-    virtual HANDLE GetHandle(){
+    HANDLE GetEvent(){
+        return hevent_;
+    }    
+    HANDLE GetHandle(){
         return (HANDLE)sock_;
     }
 
     size_t Read(void* buf, size_t len){
-        return recv(sock_, buf, len, 0);
+        return recv(sock_, (char*)buf, len, 0);
     }
 
     size_t Write(const void* buf, size_t len){
-        return send(sock_, buf, len, 0);
+        return send(sock_, (const char*)buf, len, 0);
     }
 
     virtual void Close(){
         closesocket(sock_);
     }
     virtual int Control(int cmd, void* val){
+        if(cmd == F_GETFL){
+            return flags_;
+        }
+        if(cmd == F_SETFL){
+            flags_ = (int)(uintptr_t)val;
+            if(flags_ & O_NONBLOCK){
+	            u_long nblock = 1;
+	            if(ioctlsocket(sock_, FIONBIO, &nblock)){
+                    return -1;
+                }    
+            }
+            return 0;
+        }
         return -1;
     }
     virtual off_t Seek(off_t pos, int where){
         return -1;
     }
 
-    virtual short PrePoll(short event, HANDLE* outhandle){
-       
+
+
+    virtual short PrePoll(short event){
+        if(event_ != event){ //当前监听事件不同        
+	        long wsaev = FD_CLOSE;
+	        if (event & POLLOUT) {
+		        wsaev |= FD_WRITE;
+		        wsaev |= FD_CONNECT;
+	        }
+	        if (event & POLLIN) {
+		        wsaev |= FD_READ;
+		        wsaev |= FD_ACCEPT;               
+	        }
+	        if (event & POLLPRI) {		        
+		        wsaev |= FD_OOB;                
+	        }
+            if(WSAEventSelect(sock_, hevent_, wsaev)){
+                return POLLERR;
+            }
+            event_ = event;
+        }
         return 0;
     }
-    
-    virtual void PostPoll(){        
-       // BOOL bret = GetOverlappedResult(file_, &op_, &readed_, FALSE);
+
+
+    virtual short PostPoll(short event){  
+        short revent = 0;      
+        WSANETWORKEVENTS wsaevents;
+		if (0 == WSAEnumNetworkEvents(sock_, hevent_, &wsaevents)) {
+            if(wsaevents.lNetworkEvents & FD_READ){
+                revent |= (wsaevents.iErrorCode[FD_READ_BIT])?POLLERR:POLLIN;
+            }
+            if(wsaevents.lNetworkEvents & FD_WRITE){
+                revent |= (wsaevents.iErrorCode[FD_WRITE_BIT])?POLLERR:POLLOUT;
+            }
+            if(wsaevents.lNetworkEvents & FD_OOB){
+                revent |= (wsaevents.iErrorCode[FD_OOB_BIT])?POLLERR:POLLIN;
+            }
+            if(wsaevents.lNetworkEvents & FD_ACCEPT){
+                revent |= (wsaevents.iErrorCode[FD_ACCEPT_BIT])?POLLERR:POLLIN;
+            }
+            if(wsaevents.lNetworkEvents & FD_CONNECT){
+                revent |= (wsaevents.iErrorCode[FD_CONNECT_BIT])?POLLERR:POLLIN;
+            }
+            if(wsaevents.lNetworkEvents & FD_CLOSE){
+                revent |= (wsaevents.iErrorCode[FD_CLOSE_BIT])?POLLERR:POLLIN;
+            }
+		}
+		else {
+			revent = POLLERR;			
+		}
+        return revent;
     }  
 
 private:    
     SOCKET sock_;   
-    HANDLE event_; 
-    short cur_events_;   
-    bool nonblock_;
+    HANDLE hevent_; 
+    int error_;
+    short event_;   
+    int flags_;
 };
 
+typedef std::shared_ptr<FileDescriptor>  FileDescriptorPtr;
 
-int posix_poll(struct posix_pollfd* pfds, unsigned int nfds, int timeout){
-    
+static std::unordered_map<int, FileDescriptorPtr> fd_table_;
+static int fd_index_;
+
+
+static int FileDescriptorAdd(FileDescriptorPtr ptr){
+    if(!ptr)return -1;    
+    //find unused fd 
+    while(1){
+        fd_index_ ++;
+        if(fd_index_ <= 0)fd_index_ = 1;
+        auto it = fd_table_.find(fd_index_);
+        if(it == fd_table_.end()){
+            break;
+        }
+    }
+    //add
+    fd_table_[fd_index_] = ptr;
+    return fd_index_;
+}
+
+static FileDescriptorPtr FileDescriptorGet(int fd){
+    auto it = fd_table_.find(fd);
+    if(it != fd_table_.end()){
+        return it->second;
+    }
+    return nullptr;
+}
+
+static void FileDescriptorDel(int fd){
+    fd_table_.erase(fd);
+}
+static int FileDescriptorAddSocket(SOCKET f){
+    if(f == INVALID_SOCKET)return -1;
+    FileDescriptorPtr ptr = std::make_shared<SocketFileDescriptor>(f);
+    return FileDescriptorAdd(ptr);
+}
+
+static SOCKET FileDescriptorGetSocket(int fd){
+    FileDescriptorPtr ptr = FileDescriptorGet(fd);
+    if(ptr){
+        return (SOCKET) ptr->GetHandle();
+    }
+    return INVALID_SOCKET;
+}
+/*
+static HANDLE FileDescriptorGetHandle(int fd){
+    FileDescriptorPtr ptr = FileDescriptorGet(fd);
+    if(ptr){
+        return ptr->GetHandle();
+    }
+    return NULL;
+}
+static int FileDescriptorAddHandle(HANDLE f){
+    if(!f || f == INVALID_HANDLE_VALUE)return -1;
+    FileDescriptorPtr ptr = std::make_shared<GenericFileDescriptor>(f);
+    return FileDescriptorAdd(ptr);
+}
+*/
+
+
+int posix_poll(struct pollfd* pfds, unsigned int nfds, int timeout){
+    HANDLE hevents[64];
+    int maxev = ((nfds>64)?64:nfds);
+    int i;
+    int count = 0;
+    DWORD ret;
+    for(i = 0; i<maxev; i++){
+        FileDescriptorPtr ptr = FileDescriptorGet(pfds[i].fd);
+        pfds[i].revents = ptr->PrePoll(pfds[i].events);
+        if(pfds[i].revents){
+            count ++;
+        }else{
+            hevents[i] = ptr->GetEvent();
+        }
+    }
+    if(count){
+        return count;
+    }
+    ret = WaitForMultipleObjectsEx(maxev, hevents, FALSE, timeout, TRUE);
+    if(ret >= WAIT_OBJECT_0 && ret < (WAIT_OBJECT_0 + maxev)){
+        i = ret - WAIT_OBJECT_0;
+        FileDescriptorPtr ptr = FileDescriptorGet(pfds[i].fd);
+        pfds[i].revents = ptr->PostPoll(pfds[i].events);
+        return 1;
+    }
     return -1;
 }
 
 
 ssize_t posix_read(int fd, void * buf, size_t count){
-    return 0;
+    FileDescriptorPtr ptr = FileDescriptorGet(fd);
+    if(ptr)return ptr->Read(buf, count);
+    return -1;
 }
 ssize_t posix_write(int fd, const void* buf, size_t count){
-    return 0;
+    FileDescriptorPtr ptr = FileDescriptorGet(fd);
+    if(ptr)return ptr->Write(buf, count);
+    return -1;
 }
 
 int posix_close(int fd){
+    FileDescriptorDel(fd);
     return 0;
 }
 int posix_open(const char* pathname, int flags, ...){
     return -1;
 }
 int posix_fcntl(int fd, int cmd, ...){
-    return 0;
+    va_list ap;
+    void* value; 
+    int ret = -1;   
+    FileDescriptorPtr ptr = FileDescriptorGet(fd);
+    if(ptr){
+        va_start(ap, cmd);
+        value = va_arg(ap, void*);
+        ret = ptr->Control(cmd, value);
+        va_end(ap);
+    }   
+    return ret;
 }
+
+
+int posix_socket(int af, int type, int proto){
+    SOCKET sock = socket(af, type, proto);    
+    int ret = FileDescriptorAddSocket(sock);
+    if(ret==-1)SetErrnoFromWSA();
+    return ret;    
+}
+int posix_connect(int fd, const struct sockaddr* addr, socklen_t addrlen){
+    SOCKET sock = FileDescriptorGetSocket(fd);
+    int ret = connect(sock, addr, addrlen);
+    if(ret)SetErrnoFromWSA();
+    return ret;
+}
+int posix_accept(int fd, struct sockaddr* addrbuf, socklen_t* addrlen){
+    SOCKET sock = FileDescriptorGetSocket(fd);
+    SOCKET client = accept(sock, addrbuf, addrlen);
+    int ret = FileDescriptorAddSocket(client);
+    if(ret==-1)SetErrnoFromWSA();
+    return ret;
+}
+int posix_bind(int fd, const struct sockaddr* addr, socklen_t addrlen){
+    SOCKET sock = FileDescriptorGetSocket(fd);
+    int ret = bind(sock, addr, addrlen);
+    if(ret)SetErrnoFromWSA();
+    return ret;    
+}
+int posix_listen(int fd, int cap){
+    SOCKET sock = FileDescriptorGetSocket(fd);
+    int ret = listen(sock, cap); 
+    if(ret)SetErrnoFromWSA();
+    return ret;         
+}
+ssize_t posix_recv(int fd, void* buf, size_t count, int flags){
+    SOCKET sock = FileDescriptorGetSocket(fd);
+    ssize_t ret = recv(sock, (char*)buf, count, flags); 
+    if(ret<0)SetErrnoFromWSA();
+    return ret;         
+}
+ssize_t posix_send(int fd, const void* buf, size_t count, int flags){
+    SOCKET sock = FileDescriptorGetSocket(fd);
+    ssize_t ret = send(sock, (char*)buf, count, flags);
+    if(ret<0)SetErrnoFromWSA();
+    return ret;               
+}
+ssize_t posix_recvfrom(int fd, void* buf, size_t buflen, int flags, struct sockaddr* addr, socklen_t* addrlen){
+    SOCKET sock = FileDescriptorGetSocket(fd);
+    ssize_t ret = recvfrom(sock, (char*)buf, buflen, flags, addr, addrlen); 
+    if(ret<0)SetErrnoFromWSA();
+    return ret;
+}
+ssize_t posix_sendto(int fd, const void* buf, size_t buflen, int flags, const struct sockaddr* addr, socklen_t addrlen){
+    SOCKET sock = FileDescriptorGetSocket(fd);
+    ssize_t ret = sendto(sock, (char*)buf, buflen, flags, addr, addrlen); 
+    if(ret<0)SetErrnoFromWSA();
+    return ret;
+}
+
 
 #endif
 
