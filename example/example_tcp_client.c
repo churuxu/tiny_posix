@@ -1,8 +1,12 @@
 ﻿#include "tiny_posix.h"
 
 
+//#define HOST "127.0.0.1"
+//#define PORT "8000"
+
 #define HOST "www.baidu.com"
 #define PORT "80"
+
 //#define DATA "GET / HTTP/1.1\r\nHost: www.baidu.com\r\nConnection: close\r\n\r\n"
 #define DATA "GET / HTTP/1.1\r\nHost: www.baidu.com\r\n\r\n"
 
@@ -48,6 +52,7 @@ void example_tcp_client(){
             printf("connect ok\n");
         }else{
             printf("connect error\n"); 
+            return;
         }
     }
 
@@ -62,7 +67,11 @@ void example_tcp_client(){
     fds[0].revents = 0;    
     while(1){
         ret = poll(fds, 1, 10000);
-        if(ret>0 && fds[0].revents & POLLIN){
+        if(ret>0){
+            if(fds[0].revents & POLLERR){
+                printf("poll error\n");
+                break;
+            }
             while(1){
                 ret = read(fd, buf, 1024);
                 if(ret>0){

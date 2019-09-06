@@ -436,6 +436,71 @@ ssize_t posix_sendto(int fd, const void* buf, size_t buflen, int flags, const st
 }
 
 
+
+
+
+
+//获取系统时间
+int posix_gettimeofday(struct timeval* tv, struct timezone* tz){
+	FILETIME ft;
+	uint64_t t;
+    uint64_t ms;
+	GetSystemTimeAsFileTime(&ft);
+	t = (uint64_t)ft.dwHighDateTime << 32 | ft.dwLowDateTime;	
+	ms = (t / 10000 - 11644473600000ULL);
+    tv->tv_sec = ms / 1000;
+    tv->tv_usec = (ms % 1000) * 1000;
+    return 0;
+}
+
+//设置系统时间
+int posix_settimeofday(const struct timeval* tv, const struct timezone* tz){
+    errno = EPERM;
+    return -1;
+}
+
+
+//========== sys ===========
+
+//
+static void win32_hq_delay(unsigned int us){
+	LARGE_INTEGER nTickPerSecond;
+	LARGE_INTEGER nTick;
+    LARGE_INTEGER nTimeoutTick;
+    uint64_t delaytime;
+    if(!QueryPerformanceFrequency(&nTickPerSecond)) goto error;
+	if(!QueryPerformanceCounter(&nTick)) goto error;
+    if(us < 50)goto error;
+    us -= 35; //减少一些调用耗时
+    delaytime = (us * nTickPerSecond.QuadPart) / (1000 * 1000);
+    nTimeoutTick.QuadPart = nTick.QuadPart + delaytime;
+    while(nTick.QuadPart < nTimeoutTick.QuadPart){
+        SwitchToThread();
+        if(!QueryPerformanceCounter(&nTick)) goto error;        
+    }
+    return;
+error:
+    SwitchToThread();
+    return;
+}
+
+unsigned int posix_sleep(unsigned int seconds){
+    unsigned int ms = seconds * 1000;
+    Sleep(ms);
+    return 0;
+}
+
+unsigned int posix_usleep(unsigned int micro_seconds){
+    unsigned int ms = micro_seconds / 1000;    
+    if(ms > 10){ //时间较长，直接用Sleep
+        Sleep(ms);
+    }else{ //时间较短，采用高精度等待
+        win32_hq_delay(micro_seconds);
+    }     
+    return 0;
+}
+
+
 #endif
 
 

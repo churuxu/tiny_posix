@@ -22,18 +22,22 @@ typedef int64_t ssize_t;
 #else
 typedef int32_t ssize_t;
 #endif
-typedef int socklen_t;
 
 #endif
 
 
 
-#define USE_SYSTEM_GETADDRINFO 
+#define USE_SYSTEM_ADDRINFO 
 #define USE_SYSTEM_CLOCK
+#define USE_SYSTEM_SOCKADDR
+#define USE_SYSTEM_TIMEZONE
 
 #ifdef _MSC_VER
 #define USE_SYSTEM_POLLFD
 #endif
 
+#ifdef __MINGW__
+#define USE_SYSTEM_SOCKLEN
+#endif
 
 #undef lseek

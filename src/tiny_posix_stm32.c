@@ -1379,11 +1379,11 @@ ssize_t posix_write(int fd, const void* buf, size_t sz){
 }
 
 
-int posix_poll(struct posix_pollfd* fds, unsigned int nfds, int timeout){
+int posix_poll(struct pollfd* fds, unsigned int nfds, int timeout){
     unsigned int i;
     int revent,type;
     int ret = 0;
-    struct posix_pollfd* pfd;
+    struct pollfd* pfd;
     poll_func func;
     uint32_t start = HAL_GetTick();
     do{
@@ -1453,12 +1453,18 @@ unsigned int posix_usleep(unsigned int micro_seconds){
     return micro_seconds;
 }
 
-posix_clock_t posix_clock(){
+clock_t posix_clock(){
     return HAL_GetTick();
 }
 
 
-// 
+int posix_getaddrinfo(const char* host, const char* port, const struct addrinfo* hint, struct addrinfo** ai){
+    return -1;
+}
+
+void posix_freeaddrinfo(struct addrinfo* ai){
+    
+}
 
 
 

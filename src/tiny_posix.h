@@ -54,48 +54,6 @@ extern "C" {
 
 #if !defined(__linux__)
 
-//============== types ===============
-
-
-typedef uint64_t posix_off_t;
-#if __SIZE_OF_POINTER__ == 64 
-typedef uint64_t posix_clock_t;
-#else
-typedef uint32_t posix_clock_t;
-#endif
-typedef uint64_t posix_time_t;
-typedef int posix_socklen_t;
-typedef struct posix_DIR posix_DIR;
-struct posix_timeval{
-    posix_time_t tv_sec;
-    long tv_usec;
-};
-
-struct posix_timezone{
-    int tz_minuteswest;
-    int tz_dsttime;
-};
-
-
-struct posix_sockaddr{
-    unsigned short sa_family;
-    char sa_data[14];
-};
-
-struct posix_stat{
-    unsigned short sa_family;
-    char sa_data[14];
-};
-
-
-
-struct posix_utimbuf{
-    unsigned short sa_family;
-    char sa_data[14];
-};
-
-
-
 
 //============== generic ===============
 
@@ -136,6 +94,16 @@ int posix_poll(struct pollfd* fds, unsigned int nfds, int timeout);
 
 
 //========== socket ===========
+#ifndef USE_SYSTEM_SOCKADDR
+struct sockaddr{
+    unsigned short sa_family;
+    char sa_data[14];  
+};
+#endif
+#ifndef USE_SYSTEM_SOCKLEN
+typedef int socklen_t;
+#endif
+
 int posix_socket(int af, int type, int proto);
 int posix_connect(int fd, const struct sockaddr* addr, socklen_t addrlen);
 int posix_accept(int fd, struct sockaddr* addrbuf, socklen_t* addrlen);
@@ -146,12 +114,38 @@ ssize_t posix_send(int fd, const void* buf, size_t count, int flags);
 ssize_t posix_recvfrom(int fd, void* buf, size_t buflen, int flags, struct sockaddr* addrbuf, socklen_t* addrlen);
 ssize_t posix_sendto(int fd, const void* buf, size_t buflen, int flags, const struct sockaddr* addr, socklen_t addrlen);
 
-#ifndef USE_SYSTEM_GETADDRINFO
-int posix_getaddrinfo(const char* host, const char* port, const struct addrinfo* hint, struct addrinfo* ai);
+#ifndef USE_SYSTEM_ADDRINFO
+struct addrinfo{
+    int ai_flags;                 /* Input flags.  */
+    int ai_family;                /* Protocol family for socket.  */
+    int ai_socktype;              /* Socket type.  */
+    int ai_protocol;              /* Protocol for socket.  */
+    socklen_t ai_addrlen;         /* Length of socket address.  */
+    struct sockaddr *ai_addr;     /* Socket address for socket.  */
+    char *ai_canonname;           /* Canonical name for service location.  */
+    struct addrinfo *ai_next;     /* Pointer to next in list.  */   
+};
+int posix_getaddrinfo(const char* host, const char* port, const struct addrinfo* hint, struct addrinfo** ai);
 void posix_freeaddrinfo(struct addrinfo* ai);
 #endif
 
 //============ sys =============
+#ifndef USE_SYSTEM_TIMEVAL
+struct _timeval_64{
+    uint64_t tv_sec;
+    uint64_t tv_usec;
+};
+#define timeval _timeval_64
+#endif
+
+#ifndef USE_SYSTEM_TIMEZONE
+struct timezone{
+    int tz_minuteswest;
+    int tz_dsttime;
+};
+
+#endif
+
 #ifndef USE_SYSTEM_CLOCK
 clock_t posix_clock(void);
 #endif
@@ -239,7 +233,17 @@ int posix_tcsetattr(int fd, int opt, const struct termios* attr);
 #define recv posix_recv
 #define send posix_send
 
+
+
+#ifndef USE_SYSTEM_ADDRINFO
+#define getaddrinfo posix_getaddrinfo
+#define freeaddrinfo posix_freeaddrinfo
+#endif
+
+#ifndef USE_SYSTEM_CLOCK
 #define clock posix_clock
+#endif
+
 #define gettimeofday posix_gettimeofday
 #define settimeofday posix_settimeofday
 

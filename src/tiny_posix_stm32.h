@@ -1,5 +1,6 @@
 ﻿#pragma once
 
+
 #if defined(STM32F1)
 #include "stm32f1xx.h" 
 #elif defined(STM32F2) 
@@ -9,14 +10,27 @@
 #elif defined(STM32F4) 
 #include "stm32f4xx.h"
 #else
-
+#error "unknown stm32 family"
 #endif
+
+#include <fcntl.h>
+#include <stdint.h>
+#include <stdlib.h>
+#include <stdarg.h>
+#include <stdio.h>
+#include <unistd.h>
 
 
 #define posix_open _open 
 #define posix_close _close
 #define posix_read _read
 #define posix_write _write
+
+
+#define SOCK_STREAM 0
+#define SOCK_DGRAM  1
+
+typedef uint32_t clock_t;
 
 #ifdef __cplusplus
 extern "C" {
