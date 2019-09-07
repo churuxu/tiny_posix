@@ -25,11 +25,29 @@ typedef int32_t ssize_t;
 
 #endif
 
+#define B300    CBR_300
+#define B600    CBR_600
+#define B1200   CBR_1200
+#define B2400   CBR_2400
+#define B4800   CBR_4800
+#define B9600   CBR_9600
+#define B19200  CBR_19200
+#define B38400  CBR_38400
+#define B57600  CBR_57600
+#define B115200 CBR_115200
 
 
+typedef int speed_t;
+
+struct termios{    
+    uint32_t c_cflag;    
+    DCB dcb;
+};
+
+
+#define USE_SYSTEM_SOCKADDR
 #define USE_SYSTEM_ADDRINFO 
 #define USE_SYSTEM_CLOCK
-#define USE_SYSTEM_SOCKADDR
 #define USE_SYSTEM_TIMEZONE
 
 #ifdef _MSC_VER
@@ -41,3 +59,21 @@ typedef int32_t ssize_t;
 #endif
 
 #undef lseek
+
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
+int FileDescriptorAddSocket(SOCKET f);
+int FileDescriptorAddHandle(HANDLE f);
+SOCKET FileDescriptorGetSocket(int fd);
+HANDLE FileDescriptorGetHandle(int fd);
+
+
+
+#ifdef __cplusplus
+}
+#endif
+

@@ -167,21 +167,8 @@ void* posix_dlsym(void* handle, const char* funcname);
 
 //============== 串口 ================
 
-//波特率
-#define B300    3
-#define B600    6
-#define B1200   12
-#define B2400   24
-#define B4800   48
-#define B9600   96
-#define B19200  192
-#define B38400  384
-#define B57600  576
-#define B115200 1152
 
 //数据位
-#define CS5   0x050000
-#define CS6   0x060000
 #define CS7   0x070000
 #define CS8   0x080000
 #define CSIZE 0xff0000
@@ -198,12 +185,6 @@ void* posix_dlsym(void* handle, const char* funcname);
 #define TCSADRAIN 1
 #define TCSAFLUSH 2
 
-
-typedef int speed_t;
-
-struct termios{
-    uint32_t c_cflag;
-};
 
 int posix_cfsetispeed(struct termios* attr, speed_t t);
 int posix_cfsetospeed(struct termios* attr, speed_t t);
@@ -249,6 +230,13 @@ int posix_tcsetattr(int fd, int opt, const struct termios* attr);
 
 #define sleep posix_sleep
 #define usleep posix_usleep
+
+
+#define cfsetispeed posix_cfsetispeed
+#define cfsetospeed posix_cfsetospeed
+#define tcgetattr posix_tcgetattr
+#define tcsetattr posix_tcsetattr
+
 #endif
 
 #endif //defined(__linux__)

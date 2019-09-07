@@ -61,13 +61,26 @@ public:
 //常规文件
 class GenericFileDescriptor:public FileDescriptor{
 public:
-    GenericFileDescriptor(HANDLE file){
-
+    GenericFileDescriptor(HANDLE file){        
+        file_ = file;
+        buf_ = NULL;
+        buflen_ = 0;
+        readed_ = 0;
+        error_ = 0;
+        event_ = 0;
+        revent_ = 0;    
+        flags_ = 0;
+        memset(&op_, 0, sizeof(op_));
+        op_.hEvent = CreateEvent(NULL,FALSE,FALSE,NULL);
     }
     ~GenericFileDescriptor(){
-        
+        Close();
+        if(op_.hEvent){
+            CloseHandle(op_.hEvent);
+        }        
+        if(buf_)free(buf_);
     }
-    HANDLE GetEvent(){
+    HANDLE GetEvent(){        
         return op_.hEvent;
     }
     HANDLE GetHandle(){
@@ -85,9 +98,10 @@ public:
                     len = readed_;
                     readed_ = 0;                    
                 } 
-                return len;             
+                return len;
             }else{ //非阻塞，未读到结果
-                ReadFile(file_, buf_, buflen_, NULL, &op_);
+                //BOOL bret = ReadFile(file_, buf_, buflen_, NULL, &op_);
+                //int err = GetLastError();
                 return -1;
             }
         }else{ //阻塞方式读
@@ -111,7 +125,15 @@ public:
         if(cmd == F_GETFL){
             return flags_;
         }
-
+        if(cmd == F_SETFL){
+            flags_ = (int)(uintptr_t)val;
+            if(flags_ & O_NONBLOCK && !buf_){
+                buf_ = (CHAR*)malloc(4096);
+                buflen_ = 4096;
+                ReadFile(file_, buf_, buflen_, NULL, &op_);
+            }
+            return 0;
+        }
         return -1;
     }
     virtual off_t Seek(off_t pos, int where){
@@ -121,15 +143,23 @@ public:
     virtual short PrePoll(short event){
         if(!(flags_ & O_NONBLOCK))return event;
         if(readed_)return POLLIN;
+        BOOL bret = ReadFile(file_, buf_, buflen_, &readed_, &op_);
+        int err = GetLastError();
+        if(readed_)return POLLIN;
         return 0;
     }
     
-    virtual short PostPoll(short event){        
+    virtual short PostPoll(short event){ 
+        if(!(flags_ & O_NONBLOCK))return event;     
         BOOL bret = GetOverlappedResult(file_, &op_, &readed_, FALSE);
         if(!bret){
             error_ = GetLastError();
             revent_ = POLLERR;
+        }else{
+            
+            //ReadFile(file_, buf_, buflen_, NULL, &op_);
         }
+        ResetEvent(op_.hEvent);
         return 0;
     }  
 
@@ -150,6 +180,9 @@ public:
     SocketFileDescriptor(SOCKET sock){
         hevent_ = CreateEvent(NULL,FALSE,FALSE,NULL);
         sock_ = sock;
+        error_ = 0;
+        event_ = 0;
+        flags_ = 0;        
     }
     ~SocketFileDescriptor(){
         if(hevent_)CloseHandle(hevent_);
@@ -288,33 +321,33 @@ static FileDescriptorPtr FileDescriptorGet(int fd){
 static void FileDescriptorDel(int fd){
     fd_table_.erase(fd);
 }
-static int FileDescriptorAddSocket(SOCKET f){
+int FileDescriptorAddSocket(SOCKET f){
     if(f == INVALID_SOCKET)return -1;
     FileDescriptorPtr ptr = std::make_shared<SocketFileDescriptor>(f);
     return FileDescriptorAdd(ptr);
 }
 
-static SOCKET FileDescriptorGetSocket(int fd){
+SOCKET FileDescriptorGetSocket(int fd){
     FileDescriptorPtr ptr = FileDescriptorGet(fd);
     if(ptr){
         return (SOCKET) ptr->GetHandle();
     }
     return INVALID_SOCKET;
 }
-/*
-static HANDLE FileDescriptorGetHandle(int fd){
+
+HANDLE FileDescriptorGetHandle(int fd){
     FileDescriptorPtr ptr = FileDescriptorGet(fd);
     if(ptr){
         return ptr->GetHandle();
     }
     return NULL;
 }
-static int FileDescriptorAddHandle(HANDLE f){
+int FileDescriptorAddHandle(HANDLE f){
     if(!f || f == INVALID_HANDLE_VALUE)return -1;
     FileDescriptorPtr ptr = std::make_shared<GenericFileDescriptor>(f);
     return FileDescriptorAdd(ptr);
 }
-*/
+
 
 
 int posix_poll(struct pollfd* pfds, unsigned int nfds, int timeout){
@@ -362,7 +395,34 @@ int posix_close(int fd){
     return 0;
 }
 int posix_open(const char* pathname, int flags, ...){
-    return -1;
+    int acc = 0;
+    int mode = 0;
+    int attr = FILE_ATTRIBUTE_NORMAL;
+    if(flags & O_NONBLOCK){
+        attr |= FILE_FLAG_OVERLAPPED;
+    }
+    if(flags & O_RDWR){
+        acc |= GENERIC_READ | GENERIC_WRITE;
+    }
+    if(flags & O_RDONLY){
+        acc |= GENERIC_READ;
+    }
+    if(flags & O_WRONLY){
+        acc |= GENERIC_READ;
+    }    
+    if(flags & O_CREAT){
+        mode |= CREATE_NEW;
+    }else{
+        mode |= OPEN_EXISTING;
+    }
+    HANDLE file = CreateFileA(pathname, acc, 0, NULL, mode, attr, NULL);  
+    if(!file)return -1; 
+    int fd = FileDescriptorAddHandle(file);    
+    FileDescriptorPtr ptr = FileDescriptorGet(fd);
+    if(ptr){
+        ptr->Control(F_SETFL, (void*)(uintptr_t)flags);        
+    }
+    return fd;
 }
 int posix_fcntl(int fd, int cmd, ...){
     va_list ap;
@@ -500,6 +560,98 @@ unsigned int posix_usleep(unsigned int micro_seconds){
     return 0;
 }
 
+//============= dlfcn ================
+void* posix_dlopen(const char* name, int flags){
+    return (void*)LoadLibraryA(name);
+}
+
+int posix_dlclose(void* handle){
+    FreeLibrary((HMODULE)handle);   
+    return 0;
+}
+void* posix_dlsym(void* handle, const char* funcname){
+    return (void*)GetProcAddress((HMODULE)handle, funcname);
+}
+
+
+//============= termios ================
+
+int posix_cfsetispeed(struct termios* attr, speed_t t){
+    attr->dcb.BaudRate = t;
+    return 0;
+}
+int posix_cfsetospeed(struct termios* attr, speed_t t){
+    attr->dcb.BaudRate = t;
+    return 0;
+}
+int posix_tcgetattr(int fd, struct termios* attr){	
+	attr->dcb.DCBlength = sizeof(DCB);
+    HANDLE file = FileDescriptorGetHandle(fd);
+	if(!GetCommState(file, &attr->dcb))return -1;
+    attr->c_cflag = 0;    
+    //数据位长度
+    if(attr->dcb.ByteSize == 7){
+        attr->c_cflag |= CS7;
+    }else{
+        attr->c_cflag |= CS8;
+    }
+    //校验位
+    if(attr->dcb.Parity){
+        attr->c_cflag |= PARENB; 
+        if(attr->dcb.Parity == ODDPARITY)attr->c_cflag |= PARODD;  
+    }
+    //停止位
+    if(attr->dcb.StopBits == TWOSTOPBITS){
+        attr->c_cflag |= CSTOPB;
+    }
+    return 0;
+}
+int posix_tcsetattr(int fd, int opt, const struct termios* attr){
+    DCB dcb;
+    int wordlen;
+    HANDLE file = FileDescriptorGetHandle(fd);
+    memcpy(&dcb, &attr->dcb, sizeof(DCB));
+    dcb.DCBlength = sizeof(DCB);
+    //数据位长度
+    wordlen = (attr->c_cflag & CSIZE);
+    if(wordlen == CS7){
+        dcb.ByteSize = 7;
+    }else{
+        dcb.ByteSize = 8;
+    }
+    //校验位
+    if(attr->c_cflag & PARENB){
+        if(attr->c_cflag & PARODD){
+            dcb.Parity = ODDPARITY;
+        }else{
+            dcb.Parity = EVENPARITY;
+        }
+    }else{
+        dcb.Parity = NOPARITY;
+    }
+    //停止位
+    if(attr->c_cflag & CSTOPB){
+        dcb.StopBits = TWOSTOPBITS;
+    }else{
+        dcb.StopBits = ONESTOPBIT;
+    } 
+    if(!SetCommState(file, &dcb))return -1;
+
+    //默认超时设置
+    /*
+	COMMTIMEOUTS CommTimeOuts;
+	CommTimeOuts.ReadIntervalTimeout = MAXDWORD;
+	CommTimeOuts.ReadTotalTimeoutMultiplier = 0;
+	CommTimeOuts.ReadTotalTimeoutConstant = 0;
+	CommTimeOuts.WriteTotalTimeoutMultiplier = 50;
+	CommTimeOuts.WriteTotalTimeoutConstant = 2000;
+	SetCommTimeouts(file, &CommTimeOuts);
+    */
+    //初始化设置
+    SetupComm(file, 4096, 4096);
+
+    return 0;
+}
 
 #endif
 

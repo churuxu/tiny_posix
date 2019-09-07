@@ -17,8 +17,8 @@ int main(){
     //example_key();
     //example_key_nb();
     //example_uart();
-    //example_uart_nb();
-    example_clock();
+    example_uart_nb();
+    //example_clock();
     //example_tcp_client();
     
     return 0;

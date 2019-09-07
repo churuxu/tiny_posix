@@ -32,6 +32,25 @@
 
 typedef uint32_t clock_t;
 
+#define B300    3
+#define B600    6
+#define B1200   12
+#define B2400   24
+#define B4800   48
+#define B9600   96
+#define B19200  192
+#define B38400  384
+#define B57600  576
+#define B115200 1152
+
+
+typedef uint32_t speed_t;
+
+struct termios{
+    uint32_t c_cflag;    
+};
+
+
 #ifdef __cplusplus
 extern "C" {
 #endif

@@ -498,6 +498,44 @@ int uart_set_attr(int fd, int flags){
     return 0;
 }
 
+static void uart_set_hal(int fd, int clk, int irq){
+    int index = UART_FD_GET_INDEX(fd);   
+
+    switch(index){
+        case 0: 
+            if(clk)__HAL_RCC_USART1_CLK_ENABLE();
+            if(irq)HAL_NVIC_EnableIRQ(USART1_IRQn);
+            if(irq)HAL_NVIC_SetPriority(USART1_IRQn,0,0);
+            break;
+        case 1: 
+            if(clk)__HAL_RCC_USART2_CLK_ENABLE();
+            if(irq)HAL_NVIC_EnableIRQ(USART2_IRQn);
+            if(irq)HAL_NVIC_SetPriority(USART2_IRQn,0,0);
+            break;
+#ifdef USART3        
+        case 2: 
+            if(clk)__HAL_RCC_USART3_CLK_ENABLE();
+            if(irq)HAL_NVIC_EnableIRQ(USART3_IRQn);
+            if(irq)HAL_NVIC_SetPriority(USART3_IRQn,0,0);
+            break;
+#endif
+#ifdef UART4        
+        case 3: 
+            if(clk)__HAL_RCC_UART4_CLK_ENABLE();
+            if(irq)HAL_NVIC_EnableIRQ(UART4_IRQn);
+            if(irq)HAL_NVIC_SetPriority(UART4_IRQn,0,0);
+            break;
+#endif
+#ifdef UART5 
+        case 4: 
+            if(clk)__HAL_RCC_UART5_CLK_ENABLE();
+            if(irq)HAL_NVIC_EnableIRQ(UART5_IRQn);
+            if(irq)HAL_NVIC_SetPriority(UART5_IRQn,0,0);
+            break;
+#endif        
+        default:return;
+    }   
+}
 
 
 
@@ -505,41 +543,9 @@ int uart_init(int fd, int tx, int rx, int flags){
     int index = UART_FD_GET_INDEX(fd);;
     int af = uart_get_gpio_af(index);
 
-    switch(index){
-        case 0: 
-            __HAL_RCC_USART1_CLK_ENABLE();
-            HAL_NVIC_EnableIRQ(USART1_IRQn);
-            HAL_NVIC_SetPriority(USART1_IRQn,0,0);
-            break;
-        case 1: 
-            __HAL_RCC_USART2_CLK_ENABLE();
-            HAL_NVIC_EnableIRQ(USART2_IRQn);
-            HAL_NVIC_SetPriority(USART2_IRQn,0,0);
-            break;
-#ifdef USART3        
-        case 2: 
-            __HAL_RCC_USART3_CLK_ENABLE();
-            HAL_NVIC_EnableIRQ(USART3_IRQn);
-            HAL_NVIC_SetPriority(USART3_IRQn,0,0);
-            break;
-#endif
-#ifdef UART4        
-        case 3: 
-            __HAL_RCC_UART4_CLK_ENABLE();
-            HAL_NVIC_EnableIRQ(UART4_IRQn);
-            HAL_NVIC_SetPriority(UART4_IRQn,0,0);
-            break;
-#endif
-#ifdef UART5 
-        case 4: 
-            __HAL_RCC_UART5_CLK_ENABLE();
-            HAL_NVIC_EnableIRQ(UART5_IRQn);
-            HAL_NVIC_SetPriority(UART5_IRQn,0,0);
-            break;
-#endif        
-        default:return -1;
-    }
-    
+    //开启clock
+    uart_set_hal(fd, 1, 0);
+
     gpio_init_ex(tx, GPIO_MODE_AF_PP, GPIO_NOPULL, af);
 #ifdef GPIO_AF7_USART1 //have af
     gpio_init_ex(rx, GPIO_MODE_AF_PP, GPIO_NOPULL, af);
@@ -563,6 +569,9 @@ static int uart_set_flags(int fd, int flags){
         }
         fifo_init(&obj->txfifo, obj->buf, UART_FIFO_BUFSIZE);
         fifo_init(&obj->rxfifo, obj->buf + UART_FIFO_BUFSIZE, UART_FIFO_BUFSIZE);
+
+        //开启中断
+        uart_set_hal(fd, 0, 1);
 
         //开始异步接收
         HAL_UART_Receive_IT(&obj->handle, &obj->rxch, 1);
@@ -661,21 +670,19 @@ int uart_poll(int fd, int event){
 }
 
 int posix_cfsetispeed(struct termios* attr, speed_t t){
-    attr->c_cflag &= 0xffff0000;
-    attr->c_cflag |= t;
+    attr->c_cflag |= (0x0000ffff&t);
     return 0;
 }
 int posix_cfsetospeed(struct termios* attr, speed_t t){
-    attr->c_cflag &= 0xffff0000;
-    attr->c_cflag |= t;
-    return 0;    
+    attr->c_cflag |= (0x0000ffff&t);
+    return 0;
 }
 int posix_tcgetattr(int fd, struct termios* attr){
     int flag = uart_get_attr(fd);
     attr->c_cflag = flag;
     return (flag == 0);
 }
-int posix_tcsetattr(int fd, int opt, const struct termios* attr){
+int posix_tcsetattr(int fd, int act, const struct termios* attr){
     return uart_set_attr(fd, attr->c_cflag);
 }
 //=====================================================
@@ -1465,6 +1472,7 @@ int posix_getaddrinfo(const char* host, const char* port, const struct addrinfo*
 void posix_freeaddrinfo(struct addrinfo* ai){
     
 }
+
 
 
 

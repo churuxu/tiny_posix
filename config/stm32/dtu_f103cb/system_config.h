@@ -14,7 +14,7 @@
 #define TEST_SPI1_NSS GPIO_FD(PORTA, 8)
 #define TEST_SPI1  SPI_FD(2)
 
-#define MOUNT_FD(filename, fd) if(strcmp(name, filename)==0)return fd
+#define MOUNT_FD(filename, fd) if(strcmp(name, filename)==0){fcntl(fd, F_SETFL, flags); return fd;}
 
 
 int System_Open(const char* name, int flags){
@@ -25,6 +25,8 @@ int System_Open(const char* name, int flags){
     MOUNT_FD("/leds/led4", LED4);
 
     MOUNT_FD("/keys/key0", KEY1);
+
+    
     return -1;
 }
 
@@ -40,8 +42,8 @@ void System_Config(){
 
     gpio_init(KEY1, GPIO_MODE_IT_RISING_FALLING, 0);
 
-    //uart_init(SERIAL1, UART1_DEFAULT_PINS, B115200|CS8);
-    //uart_init(SERIAL2, UART3_DEFAULT_PINS, B115200|CS8);
+    uart_init(SERIAL1, UART1_DEFAULT_PINS, B115200|CS8);
+    uart_init(SERIAL2, UART3_DEFAULT_PINS, B115200|CS8);
 
 
     //gpio_init(TEST_SPI1_NSS, GPIO_MODE_OUTPUT_PP, GPIO_NOPULL);

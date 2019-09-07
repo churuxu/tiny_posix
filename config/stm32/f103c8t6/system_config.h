@@ -7,7 +7,7 @@
 
 #define TEST_I2C1 I2C_FD(1)
 
-#define MOUNT_FD(filename, fd) if(strcmp(name, filename)==0)return fd
+#define MOUNT_FD(filename, fd) if(strcmp(name, filename)==0){fcntl(fd, F_SETFL, flags); return fd;}
 
 
 int System_Open(const char* name, int flags){

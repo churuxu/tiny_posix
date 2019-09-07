@@ -11,7 +11,7 @@
 #define SERIAL1 UART_FD(3)
 #define SERIAL2 UART_FD(5)
 
-#define MOUNT_FD(filename, fd) if(strcmp(name, filename)==0)return fd
+#define MOUNT_FD(filename, fd) if(strcmp(name, filename)==0){fcntl(fd, F_SETFL, flags); return fd;}
 
 int System_Open(const char* name, int flags){
     MOUNT_FD("/leds/led0", LED0);
