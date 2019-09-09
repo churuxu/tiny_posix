@@ -45,6 +45,7 @@ Socket
 #include <fcntl.h> //fcntl
 #include <termios.h> 
 #include <sys/socket.h> 
+#include <netdb.h>
 #endif
 
 

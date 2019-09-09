@@ -3,10 +3,10 @@
 //非阻塞示例
 #ifdef _WIN32
 #define PORT_NAME "COM8"
-#define ECHO 0
+#define ECHO_DATA 0
 #else
 #define PORT_NAME "/dev/ttyS0"
-#define ECHO 1
+#define ECHO_DATA 1
 #endif
 
 
@@ -54,7 +54,7 @@ void example_uart_nb(){
             ret = read(fd, buf, 64);
             if(ret>0){
                 printf("uart recved %d bytes\n", ret);
-                if(ECHO){
+                if(ECHO_DATA){
                     write(fd, buf, ret);
                 }else{
                     buf[ret] = 0;
