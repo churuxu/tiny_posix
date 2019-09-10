@@ -2,7 +2,7 @@
 
 //非阻塞示例
 #ifdef _WIN32
-#define PORT_NAME "COM8"
+#define PORT_NAME "COM4"
 #define ECHO_DATA 0
 #else
 #define PORT_NAME "/dev/ttyS0"
@@ -19,7 +19,7 @@ void example_uart_nb(){
 
     fd = open(PORT_NAME, O_RDWR|O_NONBLOCK);
     if(fd<0){
-        printf("uart open error\n");
+        perror("uart open error\n");        
         return;
     }else{
         printf("uart opened\n");

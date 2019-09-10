@@ -13,6 +13,7 @@ extern void example_tcp_client();
 
 int main(){
     printf("hello world\n");
+   //test_win32();
     //example_led();
     //example_key();
     //example_key_nb();

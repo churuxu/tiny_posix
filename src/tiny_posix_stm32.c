@@ -670,11 +670,13 @@ int uart_poll(int fd, int event){
 }
 
 int posix_cfsetispeed(struct termios* attr, speed_t t){
-    attr->c_cflag |= (0x0000ffff&t);
+    attr->c_cflag &= 0xffff0000;
+    attr->c_cflag |= t;
     return 0;
 }
 int posix_cfsetospeed(struct termios* attr, speed_t t){
-    attr->c_cflag |= (0x0000ffff&t);
+    attr->c_cflag &= 0xffff0000;
+    attr->c_cflag |= t;
     return 0;
 }
 int posix_tcgetattr(int fd, struct termios* attr){

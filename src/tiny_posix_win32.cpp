@@ -127,10 +127,14 @@ public:
         }
         if(cmd == F_SETFL){
             flags_ = (int)(uintptr_t)val;
-            if(flags_ & O_NONBLOCK && !buf_){
-                buf_ = (CHAR*)malloc(4096);
+            if(flags_ & O_NONBLOCK){
+                if(!buf_)buf_ = (CHAR*)malloc(4096);
                 buflen_ = 4096;
-                ReadFile(file_, buf_, buflen_, NULL, &op_);
+                BOOL bret = ReadFile(file_, buf_, buflen_, NULL, &op_);
+                int err = GetLastError();
+                if(err != ERROR_IO_PENDING){
+                    return -1;
+                }
             }
             return 0;
         }
@@ -638,17 +642,19 @@ int posix_tcsetattr(int fd, int opt, const struct termios* attr){
     if(!SetCommState(file, &dcb))return -1;
 
     //默认超时设置
-    /*
+    
 	COMMTIMEOUTS CommTimeOuts;
-	CommTimeOuts.ReadIntervalTimeout = MAXDWORD;
+	CommTimeOuts.ReadIntervalTimeout = 50;
 	CommTimeOuts.ReadTotalTimeoutMultiplier = 0;
-	CommTimeOuts.ReadTotalTimeoutConstant = 0;
+	CommTimeOuts.ReadTotalTimeoutConstant = 0;   
 	CommTimeOuts.WriteTotalTimeoutMultiplier = 50;
 	CommTimeOuts.WriteTotalTimeoutConstant = 2000;
-	SetCommTimeouts(file, &CommTimeOuts);
-    */
+	if(!SetCommTimeouts(file, &CommTimeOuts))return -1;
+    
+    if(!SetCommMask(file,  EV_BREAK|EV_ERR))return -1;
+
     //初始化设置
-    SetupComm(file, 4096, 4096);
+    if(!SetupComm(file, 4096, 4096))return -1;
 
     return 0;
 }
