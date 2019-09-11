@@ -13,7 +13,7 @@ int example_rtc(){
 		time(&tim);
 		t = localtime(&tim);
 		int ret = strftime(buf, 64, "%Y-%m-%d %H:%M:%S", t);
-		printf("%d, %s\n",sizeof(time_t),buf);
+		printf("%s\n",buf);
 		sleep(1);
 	}
 	return 0;

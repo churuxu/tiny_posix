@@ -88,15 +88,66 @@ static void default_clock_init(){
 #endif
 }
 
-static time_t current_time_;
+static RTC_HandleTypeDef rtc_;
+static time_t current_timestamp_;
+static uint32_t current_tick_ms_;
+
+
+static void rtc_to_timestamp(){
+    RTC_TimeTypeDef rtctime = {0};
+    RTC_DateTypeDef rtcdate = {0};
+    struct tm t = {0};
+    HAL_RTC_GetDate(&rtc_, &rtcdate, RTC_FORMAT_BIN);
+    HAL_RTC_GetTime(&rtc_, &rtctime, RTC_FORMAT_BIN);    
+    t.tm_year = rtcdate.Year+100;
+	t.tm_mon = rtcdate.Month-1;  
+	t.tm_mday = rtcdate.Date;  
+	t.tm_hour = rtctime.Hours-8;  
+	t.tm_min = rtctime.Minutes;  
+	t.tm_sec = rtctime.Seconds; 
+    current_timestamp_ = mktime(&t);
+}
+static int timestamp_to_rtc(){
+    RTC_TimeTypeDef rtctime = {0};
+    RTC_DateTypeDef rtcdate = {0};
+    struct tm* t = localtime(&current_timestamp_);
+    if(!t)return -2;
+	rtcdate.Year = t->tm_year - 100;
+	rtcdate.Month = t->tm_mon + 1;
+	rtcdate.Date = t->tm_mday;
+	rtctime.Hours = t->tm_hour + 8;
+	rtctime.Minutes = t->tm_min;
+	rtctime.Seconds = t->tm_sec;
+    if(HAL_OK != HAL_RTC_SetDate(&rtc_, &rtcdate, RTC_FORMAT_BIN))return -1;
+    if(HAL_OK != HAL_RTC_SetTime(&rtc_, &rtctime, RTC_FORMAT_BIN))return -1;
+    return 0;    
+}
 
 time_t posix_time(time_t* t){
-    if(t)*t = current_time_;
-    return current_time_;
+    if(t)*t = current_timestamp_;
+    return current_timestamp_;
+}
+
+int posix_gettimeofday(struct timeval* tv, struct timezone* tz){
+    tv->tv_sec = current_timestamp_;
+    tv->tv_usec = current_tick_ms_ * 1000;
+    return 0;
+}
+int posix_settimeofday(const struct timeval* tv, const struct timezone* tz){
+    current_timestamp_ = tv->tv_sec;
+    current_tick_ms_ = tv->tv_usec / 1000;
+    return timestamp_to_rtc();
 }
 
 static void rtc_init(){
-   
+    __HAL_RCC_RTC_ENABLE( );
+
+    rtc_.Instance = RTC;
+    rtc_.Init.AsynchPrediv = RTC_AUTO_1_SECOND;
+    rtc_.Init.OutPut = RTC_OUTPUTSOURCE_NONE;
+    HAL_RTC_Init(&rtc_);
+
+    rtc_to_timestamp();
 }
 
 
@@ -1496,8 +1547,10 @@ void posix_freeaddrinfo(struct addrinfo* ai){
 void SysTick_Handler(){ 
     HAL_IncTick();
     HAL_SYSTICK_IRQHandler(); 
-    if(HAL_GetTick() % 1000 == 0){
-        current_time_ ++;
+    current_tick_ms_ ++;
+    if(current_tick_ms_>=1000){
+        current_tick_ms_ = 0;
+        current_timestamp_ ++;
     }
 }
 void EXTI0_IRQHandler(){
