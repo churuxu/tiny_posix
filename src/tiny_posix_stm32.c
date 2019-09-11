@@ -88,6 +88,16 @@ static void default_clock_init(){
 #endif
 }
 
+static time_t current_time_;
+
+time_t posix_time(time_t* t){
+    if(t)*t = current_time_;
+    return current_time_;
+}
+
+static void rtc_init(){
+   
+}
 
 
 #ifdef __GNUC__
@@ -99,6 +109,8 @@ void tiny_posix_init(){
     SystemClock_Config();
 
     default_clock_init();
+
+    rtc_init();
 
     HAL_SYSTICK_Config(HAL_RCC_GetHCLKFreq()/1000);
 
@@ -1484,6 +1496,9 @@ void posix_freeaddrinfo(struct addrinfo* ai){
 void SysTick_Handler(){ 
     HAL_IncTick();
     HAL_SYSTICK_IRQHandler(); 
+    if(HAL_GetTick() % 1000 == 0){
+        current_time_ ++;
+    }
 }
 void EXTI0_IRQHandler(){
     HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_0);

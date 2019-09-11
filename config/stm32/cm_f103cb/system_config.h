@@ -37,7 +37,7 @@ void System_Config(){
     gpio_init(TEST_SPI1_NSS, GPIO_MODE_OUTPUT_PP, GPIO_NOPULL);
     spi_init(TEST_SPI1, SPI2_DEFAULT_PINS);
 
-    //stdio_set_fd(SERIAL2, SERIAL2, SERIAL2);
+    stdio_set_fd(SERIAL2, SERIAL2, SERIAL2);
 }
 
 

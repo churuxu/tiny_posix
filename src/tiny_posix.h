@@ -150,7 +150,9 @@ struct timezone{
 #ifndef USE_SYSTEM_CLOCK
 clock_t posix_clock(void);
 #endif
-
+#ifndef USE_SYSTEM_TIME
+time_t posix_time(time_t* out);
+#endif
 int posix_gettimeofday(struct timeval* tv, struct timezone* tz);
 int posix_settimeofday(const struct timeval* tv, const struct timezone* tz);
 
@@ -225,7 +227,9 @@ int posix_tcsetattr(int fd, int opt, const struct termios* attr);
 #ifndef USE_SYSTEM_CLOCK
 #define clock posix_clock
 #endif
-
+#ifndef USE_SYSTEM_TIME
+#define time posix_time
+#endif
 #define gettimeofday posix_gettimeofday
 #define settimeofday posix_settimeofday
 

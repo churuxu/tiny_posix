@@ -47,6 +47,7 @@ struct termios{
 
 #define USE_SYSTEM_SOCKADDR
 #define USE_SYSTEM_ADDRINFO 
+#define USE_SYSTEM_TIME
 #define USE_SYSTEM_CLOCK
 #define USE_SYSTEM_TIMEZONE
 
