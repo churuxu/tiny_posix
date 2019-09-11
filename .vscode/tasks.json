@@ -14,7 +14,7 @@
        },{
              "label": "MakeDirectory",             
              "type": "shell",
-             "command":"mkdir -p -f build/${config:BuildConfig}",
+             "command":"mkdir -p build/${config:BuildConfig}",
              "windows": {
                 "command":"cmd /c if not exist build\\${config:BuildConfigWin32} md build\\${config:BuildConfigWin32}", 
              }, 
