@@ -18,7 +18,15 @@ static void SetErrnoFromWSA(){
     }
     if(err)errno = err;
 }
-
+static void SetErrnoFromWin32Error(){
+    int err = 0;
+    int win32err = GetLastError();
+    switch (win32err){
+        case ERROR_FILE_NOT_FOUND: err = ENOENT;break;        
+        default:break;
+    }
+    if(err)errno = err;
+}
 
 class Win32WSAStarter{
 public:
@@ -106,7 +114,11 @@ public:
             }
         }else{ //阻塞方式读
             DWORD rdlen = 0;
-            ReadFile(file_, buf, len, &rdlen, NULL);
+            BOOL bret = ReadFile(file_, buf, len, &rdlen, NULL);
+            if(!bret){
+                SetErrnoFromWin32Error();
+                return -1;
+            }
             return rdlen;
         }
     }
@@ -114,7 +126,11 @@ public:
     size_t Write(const void* buf, size_t len){
         //任何时候都是阻塞方式写
         DWORD wrlen = 0;
-        WriteFile(file_, buf, len, &wrlen, NULL);
+        BOOL bret = WriteFile(file_, buf, len, &wrlen, NULL);
+        if(!bret){
+            SetErrnoFromWin32Error();
+            return -1;
+        }
         return wrlen;
     }
 
@@ -406,25 +422,32 @@ int posix_open(const char* pathname, int flags, ...){
         attr |= FILE_FLAG_OVERLAPPED;
     }
     if(flags & O_RDWR){
-        acc |= GENERIC_READ | GENERIC_WRITE;
-    }
-    if(flags & O_RDONLY){
-        acc |= GENERIC_READ;
+        acc |= (GENERIC_READ | GENERIC_WRITE);
     }
     if(flags & O_WRONLY){
-        acc |= GENERIC_READ;
-    }    
+        acc |= GENERIC_WRITE;
+    } 
+    if(!acc)acc = GENERIC_READ;
+    
+    HANDLE file = NULL;
     if(flags & O_CREAT){
-        mode |= CREATE_NEW;
+        mode = CREATE_ALWAYS;
     }else{
-        mode |= OPEN_EXISTING;
+        mode = OPEN_EXISTING;
     }
-    HANDLE file = CreateFileA(pathname, acc, 0, NULL, mode, attr, NULL);  
-    if(!file)return -1; 
+
+    file = CreateFileA(pathname, acc, 0, NULL, mode, attr, NULL);  
+    if(!file || file == INVALID_HANDLE_VALUE){
+        SetErrnoFromWin32Error();
+        return -1; 
+    }
     int fd = FileDescriptorAddHandle(file);    
     FileDescriptorPtr ptr = FileDescriptorGet(fd);
     if(ptr){
-        ptr->Control(F_SETFL, (void*)(uintptr_t)flags);        
+        if(ptr->Control(F_SETFL, (void*)(uintptr_t)flags)){
+            FileDescriptorDel(fd);
+            return -1;
+        }        
     }
     return fd;
 }
