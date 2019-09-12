@@ -33,8 +33,17 @@ void example_file(){
         perror("open for read error\n");
         return ;
     }
-    ret = read(fd, buf, 64);
+
+    ret = lseek(fd, 0, SEEK_END);
     if(ret != 5){
+        perror("lseek file error\n");
+        return ;
+    } 
+
+    ret = lseek(fd, 1, SEEK_SET);
+
+    ret = read(fd, buf, 64);
+    if(ret != 4){
         perror("read file error\n");
         return ;
     }

@@ -156,8 +156,18 @@ public:
         }
         return -1;
     }
+
     virtual off_t Seek(off_t pos, int where){
-        return -1;
+        LARGE_INTEGER oldpos, newpos;
+        int method = FILE_BEGIN;
+        if(where == SEEK_END)method = FILE_END;
+        if(where == SEEK_CUR)method = FILE_CURRENT;
+        oldpos.QuadPart = pos;        
+        if(!SetFilePointerEx(file_, oldpos, &newpos, method)){
+            SetErrnoFromWin32Error();
+            return -1;
+        }
+        return newpos.QuadPart;
     }
 
     virtual short PrePoll(short event){
@@ -464,7 +474,13 @@ int posix_fcntl(int fd, int cmd, ...){
     }   
     return ret;
 }
-
+off_t posix_lseek(int fd, off_t offset, int where){
+    FileDescriptorPtr ptr = FileDescriptorGet(fd);
+    if(ptr){
+        return ptr->Seek(offset, where);
+    }   
+    return -1;    
+}
 
 int posix_socket(int af, int type, int proto){
     SOCKET sock = socket(af, type, proto);    
