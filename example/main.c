@@ -10,6 +10,7 @@ extern void example_uart_nb();
 extern void example_rtc();
 extern void example_clock();
 extern void example_tcp_client();
+extern void example_tcp_server();
 extern void example_file();
 
 int main(){
@@ -24,8 +25,8 @@ int main(){
     //example_rtc();
     //example_clock();
     //example_tcp_client();
-    
-    example_file();
+    example_tcp_server();
+    //example_file();
 
     while(1){
         i++;

@@ -42,9 +42,9 @@ class FileDescriptor{
 public:
     virtual ~FileDescriptor(){};
 
-    virtual size_t Read(void* buf, size_t len) = 0;
+    virtual ssize_t Read(void* buf, size_t len) = 0;
 
-    virtual size_t Write(const void* buf, size_t len) = 0;
+    virtual ssize_t Write(const void* buf, size_t len) = 0;
 
     virtual void Close() = 0;
 
@@ -94,7 +94,7 @@ public:
     HANDLE GetHandle(){
         return file_;
     }
-    size_t Read(void* buf, size_t len){
+    ssize_t Read(void* buf, size_t len){
         if(flags_ & O_NONBLOCK){
             if(readed_){ //非阻塞，已读到结果
                 if(readed_ > len){
@@ -123,7 +123,7 @@ public:
         }
     }
 
-    size_t Write(const void* buf, size_t len){
+    ssize_t Write(const void* buf, size_t len){
         //任何时候都是阻塞方式写
         DWORD wrlen = 0;
         BOOL bret = WriteFile(file_, buf, len, &wrlen, NULL);
@@ -225,12 +225,16 @@ public:
         return (HANDLE)sock_;
     }
 
-    size_t Read(void* buf, size_t len){
-        return recv(sock_, (char*)buf, len, 0);
+    ssize_t Read(void* buf, size_t len){
+        ssize_t ret = recv(sock_, (char*)buf, len, 0);
+        if(ret < 0)SetErrnoFromWSA();
+        return ret;
     }
 
-    size_t Write(const void* buf, size_t len){
-        return send(sock_, (const char*)buf, len, 0);
+    ssize_t Write(const void* buf, size_t len){
+        ssize_t ret = send(sock_, (const char*)buf, len, 0);
+        if(ret < 0)SetErrnoFromWSA();
+        return ret;        
     }
 
     virtual void Close(){
@@ -388,6 +392,7 @@ int posix_poll(struct pollfd* pfds, unsigned int nfds, int timeout){
     DWORD ret;
     for(i = 0; i<maxev; i++){
         FileDescriptorPtr ptr = FileDescriptorGet(pfds[i].fd);
+        if(!ptr)return -1;
         pfds[i].revents = ptr->PrePoll(pfds[i].events);
         if(pfds[i].revents){
             count ++;
