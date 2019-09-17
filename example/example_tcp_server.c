@@ -34,7 +34,7 @@ void example_tcp_server(){
     }
 
     ret = bind(fd, ai->ai_addr, ai->ai_addrlen);
-    if(ret){       
+    if(ret){
         perror("bind socket error\n");
         return;
     }

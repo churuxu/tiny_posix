@@ -14,6 +14,14 @@ static void SetErrnoFromWSA(){
     switch (wsaerr){
         case WSAEWOULDBLOCK: err = EWOULDBLOCK;break;
         case WSATRY_AGAIN: err = EAGAIN;break;
+        case WSAEADDRINUSE: err = EADDRINUSE;break;
+        case WSAEALREADY: err = EALREADY;break;
+        case WSAEBADF: err = EBADF;break;
+        case WSAECONNRESET: err = ECONNRESET;break;
+        case WSAECONNREFUSED: err = ECONNREFUSED;break;
+        case WSAEFAULT: err = EFAULT;break;        
+        case WSAEHOSTUNREACH: err = EHOSTUNREACH;break;
+        case WSAENOBUFS: err = ENOBUFS;break;
         default:break;
     }
     if(err)errno = err;
