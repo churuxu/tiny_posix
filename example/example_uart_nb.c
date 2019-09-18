@@ -2,7 +2,7 @@
 
 //非阻塞示例
 #ifdef _WIN32
-#define PORT_NAME "COM4"
+#define PORT_NAME "\\\\.\\COM20"
 #define ECHO_DATA 0
 #else
 #define PORT_NAME "/dev/ttyS0"

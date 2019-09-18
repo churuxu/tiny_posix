@@ -21,11 +21,11 @@ int main(){
     //example_key();
     //example_key_nb();
     //example_uart();
-    //example_uart_nb();
+    example_uart_nb();
     //example_rtc();
     //example_clock();
     //example_tcp_client();
-    example_tcp_server();
+    //example_tcp_server();
     //example_file();
 
     while(1){
