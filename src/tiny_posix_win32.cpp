@@ -8,6 +8,20 @@
 #include <unordered_map>
 
 
+#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_APP | WINAPI_PARTITION_SYSTEM)
+#define TINY_POSIX_UWP
+#endif
+
+
+static LPCWSTR UTF8ToUTF16(const char* str, WCHAR* buf, int buflen) {
+	int len = MultiByteToWideChar(CP_UTF8, 0, str, -1, buf, buflen);
+	if (len <= 0) {
+		buf[0] = 0;		
+	}
+	return buf;
+}
+
+
 static void SetErrnoFromWSA(){
     int err = 0;
     int wsaerr = WSAGetLastError();
@@ -440,6 +454,7 @@ int posix_close(int fd){
 int posix_open(const char* pathname, int flags, ...){
     int acc = 0;
     int mode = 0;
+	WCHAR buf[MAX_PATH];
     int attr = FILE_ATTRIBUTE_NORMAL;
     if(flags & O_NONBLOCK){
         attr |= FILE_FLAG_OVERLAPPED;
@@ -458,8 +473,16 @@ int posix_open(const char* pathname, int flags, ...){
     }else{
         mode = OPEN_EXISTING;
     }
-
-    file = CreateFileA(pathname, acc, 0, NULL, mode, attr, NULL);  
+	LPCWSTR wname = UTF8ToUTF16(pathname, buf, MAX_PATH);
+#ifdef TINY_POSIX_UWP
+	CREATEFILE2_EXTENDED_PARAMETERS param;
+	ZeroMemory(&param, sizeof(param));
+	param.dwSize = sizeof(param);
+	param.dwFileAttributes = attr;	
+	file = CreateFile2(wname, acc, 0, mode, &param);
+#else
+    file = CreateFileW(wname, acc, 0, NULL, mode, attr, NULL);
+#endif
     if(!file || file == INVALID_HANDLE_VALUE){
         SetErrnoFromWin32Error();
         return -1; 
@@ -618,7 +641,13 @@ unsigned int posix_usleep(unsigned int micro_seconds){
 
 //============= dlfcn ================
 void* posix_dlopen(const char* name, int flags){
-    return (void*)LoadLibraryA(name);
+#ifdef TINY_POSIX_UWP
+	WCHAR buf[MAX_PATH];
+	LPCWSTR wname = UTF8ToUTF16(name, buf, MAX_PATH);
+	return (void*)LoadPackagedLibrary(wname, flags);
+#else
+	return (void*)LoadLibraryA(name);
+#endif    
 }
 
 int posix_dlclose(void* handle){

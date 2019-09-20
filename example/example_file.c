@@ -52,7 +52,7 @@ void example_file(){
 
     close(fd);
 
-    unlink("test.txt");
+    //unlink("test.txt");
 
 }
 
