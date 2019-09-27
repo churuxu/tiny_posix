@@ -8,7 +8,7 @@
 #include <unordered_map>
 
 
-#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_APP | WINAPI_PARTITION_SYSTEM)
+#if WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_APP) && !WINAPI_FAMILY_PARTITION(WINAPI_PARTITION_DESKTOP)
 #define TINY_POSIX_UWP
 #endif
 
@@ -116,6 +116,7 @@ public:
     HANDLE GetHandle(){
         return file_;
     }
+    
     ssize_t Read(void* buf, size_t len){
         if(flags_ & O_NONBLOCK){
             if(readed_){ //非阻塞，已读到结果
