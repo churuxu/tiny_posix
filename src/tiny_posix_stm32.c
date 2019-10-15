@@ -1424,15 +1424,18 @@ typedef struct file_ops{
     write_func wr;    
     fcntl_func fctl;
     poll_func pl;
+    close_func cl;
 }file_ops;
 
 static file_ops file_ops_[] = {
-    {stdio_read, stdio_write, NULL, NULL},
-    {gpio_read,  gpio_write,  gpio_fcntl, gpio_poll},
-    {uart_read,  uart_write,  uart_fcntl, uart_poll}, 
-    {spi_read,   spi_write,   NULL, NULL}, 
-    {i2c_read,   i2c_write,   NULL, NULL}, 
-    {rom_read,   rom_write,  NULL, NULL}, 
+    {stdio_read, stdio_write, NULL, NULL, NULL},
+    {gpio_read,  gpio_write,  gpio_fcntl, gpio_poll, NULL},
+    {uart_read,  uart_write,  uart_fcntl, uart_poll, NULL}, 
+    {spi_read,   spi_write,   NULL, NULL, NULL}, 
+    {i2c_read,   i2c_write,   NULL, NULL, NULL}, 
+    {sock_read,   sock_write,  sock_fcntl, sock_poll, sock_close}, 
+    {rom_read,   rom_write,  NULL, NULL, NULL}, 
+
 };
 
 
@@ -1485,7 +1488,10 @@ int posix_open(const char* pathname, int flags, ...){
 }
 
 int posix_close(int fd){
-    return 0;
+    int type = FD_GET_TYPE(fd);
+    close_func func = file_ops_[type].cl;
+    if(func)return func(fd);
+    return -1;
 }
 
 
@@ -1539,7 +1545,146 @@ void posix_freeaddrinfo(struct addrinfo* ai){
 }
 
 
+// ======================== socket api ==========================
 
+#define MAX_SOCKET 8
+#define MAX_SOCKET_PROVIDER 2
+
+typedef struct socket_object{
+    void* handle;
+    socket_provider* provider;
+    int flags;
+    uint8_t af;
+    uint8_t type;
+    uint8_t protocol;
+    uint8_t used;
+}socket_object;
+
+static socket_object socks_[MAX_SOCKET];
+static socket_provider* sock_providers_[MAX_SOCKET_PROVIDER];
+static uint8_t sock_provider_count_;
+
+void socket_provider_register(const socket_provider* p){    
+    if(sock_provider_count_ == MAX_SOCKET_PROVIDER)return;
+    sock_providers_[sock_provider_count_] = 0;
+    sock_provider_count_ ++;
+}
+
+
+
+
+
+//获取一个socket object
+static socket_object* prepare_socket_object(int fd){
+    socket_object* obj;
+    int i;
+    int index = fd & 0xffffff;
+    if(index >= MAX_SOCKET)return NULL;
+    obj = &socks_[index];
+    if(!obj->used)return NULL;
+    if(!obj->handle){ //未初始化
+        for(i=0; i<MAX_SOCKET_PROVIDER; i++){
+            obj->handle = sock_providers_[i]->socket_create(obj->af, obj->type, obj->protocol);
+            if(obj->handle){
+                obj->provider = sock_providers_[i];
+                break;
+            }
+        }
+    }
+    if(!obj->handle)return NULL;
+    return obj;
+}
+
+int sock_read(int fd, void* buf, int len){
+    return recv(fd, buf, len, 0);
+}
+int sock_write(int fd, const void* buf, int len){
+    return send(fd, buf, len, 0);
+}
+int sock_fcntl(int fd, int cmd, void* val){
+    socket_object* obj = prepare_socket_object(fd);
+    if(!obj){return 0;}
+    if(cmd == F_GETFL){
+        return obj->flags;
+    }else if(cmd == F_SETFL){
+        obj->flags = (int)(uintptr_t)val;
+    }
+    return -1;
+}
+int sock_poll(int fd, int event){
+    socket_object* obj = prepare_socket_object(fd);
+    if(!obj){return 0;}
+    return obj->provider->socket_poll(obj->handle, event);    
+}
+int sock_close(int fd){
+    int ret;
+    socket_object* obj = prepare_socket_object(fd);
+    if(!obj){return 0;}
+    ret = obj->provider->socket_close(obj->handle); 
+    obj->handle = NULL;
+    obj->used = 0;
+    return ret;  
+}
+
+int posix_socket(int af, int type, int proto){
+    int i;
+    socket_object* obj;
+    for(i=0; i<MAX_SOCKET; i++){
+        obj = &socks_[i];
+        if(!obj->used){ //找到一个空闲的
+            obj->used = 1;
+            return FD_TYPE_SOCKET | i;
+        }
+    }
+    return -1;
+}
+int posix_connect(int fd, const struct sockaddr* addr, socklen_t addrlen){
+    socket_object* obj = prepare_socket_object(fd);
+    if(!obj){return -1;}
+    return obj->provider->socket_connect(obj->handle, addr, addrlen);
+}
+
+int posix_accept(int fd, struct sockaddr* addrbuf, socklen_t* addrlen){
+    socket_object* obj = prepare_socket_object(fd);
+    if(!obj){return -1;}
+    return obj->provider->socket_accept(obj->handle, addrbuf, addrlen);    
+}
+
+int posix_bind(int fd, const struct sockaddr* addr, socklen_t addrlen){
+    socket_object* obj = prepare_socket_object(fd);
+    if(!obj){return -1;}
+    return obj->provider->socket_bind(obj->handle, addr, addrlen);    
+}
+
+int posix_listen(int fd, int cap){
+    socket_object* obj = prepare_socket_object(fd);
+    if(!obj){return -1;}
+    return obj->provider->socket_listen(obj->handle, cap);      
+}
+
+ssize_t posix_recv(int fd, void* buf, size_t count, int flags){
+    socket_object* obj = prepare_socket_object(fd);
+    if(!obj){return -1;}
+    return obj->provider->socket_recv(obj->handle, buf, count, flags);     
+}
+
+ssize_t posix_send(int fd, const void* buf, size_t count, int flags){
+    socket_object* obj = prepare_socket_object(fd);
+    if(!obj){return -1;}
+    return obj->provider->socket_send(obj->handle, buf, count, flags);     
+}
+
+ssize_t posix_recvfrom(int fd, void* buf, size_t buflen, int flags, struct sockaddr* addrbuf, socklen_t* addrlen){
+    socket_object* obj = prepare_socket_object(fd);
+    if(!obj){return -1;}
+    return obj->provider->socket_recvfrom(obj->handle, buf, buflen, flags, addrbuf, addrlen);    
+}
+
+ssize_t posix_sendto(int fd, const void* buf, size_t buflen, int flags, const struct sockaddr* addr, socklen_t addrlen){
+    socket_object* obj = prepare_socket_object(fd);
+    if(!obj){return -1;}
+    return obj->provider->socket_sendto(obj->handle, buf, buflen, flags, addr, addrlen);    
+}
 
 
 //============= 各系统中断 ===============

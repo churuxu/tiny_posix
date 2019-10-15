@@ -61,9 +61,12 @@ extern "C" {
 #define FD_TYPE_UART  0x02000000
 #define FD_TYPE_SPI   0x03000000
 #define FD_TYPE_I2C   0x04000000
-#define FD_TYPE_ROM   0x05000000 //内部flash，只读
+#define FD_TYPE_SOCKET 0x05000000
 #define FD_TYPE_DISK  0x06000000 //外部flash、sdcard等，由驱动实现
 #define FD_TYPE_LCD   0x07000000
+#define FD_TYPE_ROM   0x08000000 //内部flash，只读
+
+
 //#define FD_TYPE_FLASH 0x05000000 //内部flash
 
 
@@ -72,10 +75,12 @@ extern "C" {
 
 
 typedef void (*irq_handler)();
+
 typedef int (*read_func)(int fd, void* buf, int len);
 typedef int (*write_func)(int fd, const void* buf, int len);
 typedef int (*fcntl_func)(int fd, int cmd, void* v);
 typedef int (*poll_func)(int fd, int event);
+typedef int (*close_func)(int fd);
 
 void tiny_posix_init();
 
@@ -334,6 +339,33 @@ int disk_init(int fd, Diskio_drvTypeDef* driver);
 int disk_lseek(int fd, int offset, int how);
 int disk_read(int fd, void* buf, int len);
 int disk_write(int fd, const void* buf, int len);
+
+
+typedef struct socket_provider{
+    
+    void* (*socket_create) (int family, int type, int protocol);
+    int (*socket_close) (void* sock);
+    int (*socket_send) (void* sock, const void* buf, int buflen, int flag);
+    int (*socket_recv) (void* sock, void* buf, int buflen, int flag);
+    int (*socket_connect) (void* sock, const void* addr, int addrlen);
+    int (*socket_bind) (void* sock, const void* addr, int addrlen);
+    int (*socket_listen) (void* sock, int cap);
+    int (*socket_accept) (void* sock, void* addr, int* addrlen);
+    int (*socket_sendto) (void* sock, const void* buf, int buflen, int flag, const void* addr, int addrlen);
+    int (*socket_recvfrom) (void* sock, void* buf, int buflen, int flag, void* addr, int* addrlen);
+    int (*socket_setopt) (void* sock, int opt);
+    int (*socket_poll)(void* sock, int event);
+    
+}socket_provider;
+
+void socket_provider_register(const socket_provider* p);
+
+//read/write 函数
+int sock_read(int fd, void* buf, int len);
+int sock_write(int fd, const void* buf, int len);
+int sock_fcntl(int fd, int cmd, void* val);
+int sock_poll(int fd, int event);
+int sock_close(int fd);
 
 
 #ifdef __cplusplus
