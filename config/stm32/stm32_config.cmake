@@ -1,3 +1,5 @@
+set(BUILD_TEST 1)
+
 
 set(CMAKE_SYSTEM_NAME Generic )
 set(CMAKE_C_COMPILER "arm-none-eabi-gcc" )

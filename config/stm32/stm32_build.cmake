@@ -1,8 +1,14 @@
 set(PROJNAME ${PROJECT_NAME})
 
+if(${BUILD_TEST})
+message("-- Configure for build unit test")
+set(BUILD_SRCS ${TEST_SRCS} ${LIB_SRCS})
+else()
+set(BUILD_SRCS ${MAIN_SRCS} ${LIB_SRCS})
+endif()
 
 # ------------- build application -------------
-add_executable(${PROJNAME}.elf ${MAIN_SRCS} ${LIB_SRCS} )
+add_executable(${PROJNAME}.elf ${BUILD_SRCS} )
 foreach(DEP IN LISTS LIBS)		
 	target_link_libraries(${PROJNAME}.elf ${DEP} )
 	add_dependencies(${PROJNAME}.elf ${DEP})		
