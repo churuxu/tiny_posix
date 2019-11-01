@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 #ifdef __GNUC__
 #include <unistd.h>
@@ -31,7 +32,7 @@ extern "C" {
 
 // =================== io ======================
 
-typedef void POSIX_FILE;
+typedef struct POSIX_FILE POSIX_FILE;
 
 POSIX_FILE* posix_fopen(const char* name, const char* mode);
 int posix_fclose(POSIX_FILE* file);
@@ -45,8 +46,8 @@ long posix_ftell(POSIX_FILE* file);
 // =================== file ======================
 
 struct posix_stat{
-    off_t st_size; 
-    int st_mode; 
+    off_t st_size; //文件大小
+    int st_mode;  //文件类型 和 文件选项
 };
 
 int posix_access(const char* name, int mode);
@@ -66,20 +67,53 @@ struct posix_dirent{
 POSIX_DIR* posix_opendir(const char* name);
 int posix_closedir(POSIX_DIR* dir);
 struct posix_dirent* posix_readdir(POSIX_DIR* dir);
+
 int posix_rmdir(const char* name);
 int posix_mkdir(const char* name, int mode);
 
 
 //=================== disk ======================
 
-struct posix_statvfs{
-    unsigned long f_frsize; //块大小
-    unsigned long f_blocks; //总块数量
-    unsigned long f_bavail; //可用块数量
+struct posix_statvfs{    
+    uint64_t f_blocks; //总块数量
+    uint64_t f_bavail; //可用块数量
+    uint32_t f_frsize; //块大小
 };
 
 int posix_statvfs(const char* path, struct posix_statvfs* info);
 
+
+
+//=================== 用户使用宏 ======================
+#ifndef POSIX_FILESYSTEM_IMPL
+
+#define FILE POSIX_FILE
+#define fopen posix_fopen
+#define fclose posix_fclose
+#define fwrite posix_fwrite
+#define fread posix_fread
+#define fseek posix_fseek
+#define ftell posix_ftell
+#define feof posix_feof
+
+#define remove posix_remove
+#define rename posix_rename
+#define access posix_access
+#define truncate posix_truncate
+#define stat posix_stat
+
+#define DIR POSIX_DIR 
+#define dirent posix_dirent 
+#define opendir posix_opendir
+#define closedir posix_closedir
+#define readdir posix_readdir
+
+#define rmdir posix_rmdir
+#define mkdir posix_mkdir
+
+#define statvfs posix_statvfs
+
+#endif
 
 #ifdef __cplusplus
 }

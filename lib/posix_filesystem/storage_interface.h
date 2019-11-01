@@ -3,6 +3,8 @@
 /*
 存储设备驱动接口
 
+一个storage_interface表示一个存储设备
+
 信息：
 设备名称
 块大小
@@ -23,17 +25,14 @@
 extern "C" {
 #endif
 
-
 //设备操作函数错误码
 #define STORAGE_DEVICE_ERROR_IO      -100  //设备异常
 #define STORAGE_DEVICE_READONLY  -101  //设备只读
 #define STORAGE_DEVICE_CORRUPT   -102  //设备坏块
 
+typedef struct storage_interface storage_interface;
 
-//存储设备驱动接口
-typedef struct storage_device storage_device;
-
-struct storage_device{
+struct storage_interface{
     //块大小
     size_t block_size; 
 
@@ -43,24 +42,21 @@ struct storage_device{
     //单次读写长度
     size_t rw_size; 
 
-    //读一个块中的一小段数据
+    //读一个块中的一小段数据 (必须)
     //成功返回0， 失败返回错误码
-    int (*read_op)(storage_device* device, size_t block, size_t off, void* buf, size_t len);
+    int (*read_op)(storage_interface* device, size_t block, size_t off, void* buf, size_t len);
 
-    //写一个块中的一小段数据
+    //写一个块中的一小段数据 (必须)
     //成功返回0， 失败返回错误码
-    int (*write_op)(storage_device* device, size_t block, size_t off, const void* buf, size_t len);
+    int (*write_op)(storage_interface* device, size_t block, size_t off, const void* buf, size_t len);
 
-    //擦除一块，返回
+    //擦除一块，（非必须）
     //成功返回0， 失败返回错误码 
-    int (*erase_op)(storage_device* device, size_t block);
+    int (*erase_op)(storage_interface* device, size_t block);
 
 };
 
 
-
-//添加存储设备
-int storage_device_mount(const storage_device* dev);
 
 
 
