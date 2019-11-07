@@ -456,6 +456,7 @@ int posix_open(const char* pathname, int flags, ...){
     int acc = 0;
     int mode = 0;
 	WCHAR buf[MAX_PATH];
+	WCHAR comname[MAX_PATH];
     int attr = FILE_ATTRIBUTE_NORMAL;
     if(flags & O_NONBLOCK){
         attr |= FILE_FLAG_OVERLAPPED;
@@ -475,6 +476,19 @@ int posix_open(const char* pathname, int flags, ...){
         mode = OPEN_EXISTING;
     }
 	LPCWSTR wname = UTF8ToUTF16(pathname, buf, MAX_PATH);
+	
+    if(memcmp(wname, L"COM", 3*sizeof(WCHAR)) == 0){
+        //COM10以上需要以\\\\.\\COM10这样的路径打开
+        int len = wcslen(wname);
+        if(len < 16){
+            comname[0] = '\\';
+            comname[1] = '\\';
+            comname[2] = '.';
+            comname[3] = '\\';
+            memcpy(&comname[4], wname, (len+1)*sizeof(WCHAR));
+            wname = comname;
+        }        
+    }	
 #ifdef TINY_POSIX_UWP
 	CREATEFILE2_EXTENDED_PARAMETERS param;
 	ZeroMemory(&param, sizeof(param));
