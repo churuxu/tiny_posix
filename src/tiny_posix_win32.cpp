@@ -36,7 +36,7 @@ static void SetErrnoFromWSA(){
         case WSAEFAULT: err = EFAULT;break;        
         case WSAEHOSTUNREACH: err = EHOSTUNREACH;break;
         case WSAENOBUFS: err = ENOBUFS;break;
-        default:break;
+        default:err = EIO;break;
     }
     if(err)errno = err;
 }
@@ -44,8 +44,9 @@ static void SetErrnoFromWin32Error(){
     int err = 0;
     int win32err = GetLastError();
     switch (win32err){
-        case ERROR_FILE_NOT_FOUND: err = ENOENT;break;        
-        default:break;
+        case ERROR_FILE_NOT_FOUND: err = ENOENT;break;   
+        case ERROR_ACCESS_DENIED: err = EACCES;break;       
+        default:err = EIO;break;
     }
     if(err)errno = err;
 }
@@ -170,9 +171,11 @@ public:
                 if(!buf_)buf_ = (CHAR*)malloc(4096);
                 buflen_ = 4096;
                 BOOL bret = ReadFile(file_, buf_, buflen_, NULL, &op_);
-                int err = GetLastError();
-                if(err != ERROR_IO_PENDING){
-                    return -1;
+                if(!bret){
+                    int err = GetLastError();
+                    if(err != ERROR_IO_PENDING){
+                        return -1;
+                    }
                 }
             }
             return 0;
@@ -197,7 +200,12 @@ public:
         if(!(flags_ & O_NONBLOCK))return event;
         if(readed_)return POLLIN;
         BOOL bret = ReadFile(file_, buf_, buflen_, &readed_, &op_);
-        int err = GetLastError();
+        if(!bret){
+            int err = GetLastError();
+            if(err != ERROR_IO_PENDING){
+                return POLLERR;
+            }
+        }        
         if(readed_)return POLLIN;
         return 0;
     }
@@ -456,7 +464,7 @@ int posix_open(const char* pathname, int flags, ...){
     int acc = 0;
     int mode = 0;
 	WCHAR buf[MAX_PATH];
-	WCHAR comname[MAX_PATH];
+    WCHAR comname[64];
     int attr = FILE_ATTRIBUTE_NORMAL;
     if(flags & O_NONBLOCK){
         attr |= FILE_FLAG_OVERLAPPED;
@@ -476,7 +484,7 @@ int posix_open(const char* pathname, int flags, ...){
         mode = OPEN_EXISTING;
     }
 	LPCWSTR wname = UTF8ToUTF16(pathname, buf, MAX_PATH);
-	
+
     if(memcmp(wname, L"COM", 3*sizeof(WCHAR)) == 0){
         //COM10以上需要以\\\\.\\COM10这样的路径打开
         int len = wcslen(wname);
@@ -488,7 +496,8 @@ int posix_open(const char* pathname, int flags, ...){
             memcpy(&comname[4], wname, (len+1)*sizeof(WCHAR));
             wname = comname;
         }        
-    }	
+    }
+
 #ifdef TINY_POSIX_UWP
 	CREATEFILE2_EXTENDED_PARAMETERS param;
 	ZeroMemory(&param, sizeof(param));
