@@ -147,13 +147,27 @@ public:
         }
     }
 
-    ssize_t Write(const void* buf, size_t len){
-        //任何时候都是阻塞方式写
+    ssize_t Write(const void* buf, size_t len){        
         DWORD wrlen = 0;
-        BOOL bret = WriteFile(file_, buf, len, &wrlen, NULL);
-        if(!bret){
-            SetErrnoFromWin32Error();
-            return -1;
+        BOOL bret;
+        if(flags_ & O_NONBLOCK){ //非阻塞文件，阻塞写
+            OVERLAPPED op = {0};
+            bret = WriteFile(file_, buf, len, &wrlen, &op);
+            if(!bret && GetLastError() != ERROR_IO_PENDING){
+                SetErrnoFromWin32Error();
+                return -1;
+            }
+            bret = GetOverlappedResult(file_, &op, &wrlen, TRUE);
+            if(!bret){
+                SetErrnoFromWin32Error();
+                return -1;
+            }
+        }else{ //普通文件阻塞写       
+            bret = WriteFile(file_, buf, len, &wrlen, NULL);
+            if(!bret){
+                SetErrnoFromWin32Error();
+                return -1;
+            }
         }
         return wrlen;
     }
